@@ -1,0 +1,136 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          # Values for generating .env on the VPS
+          ENV_POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          ENV_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          ENV_POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          ENV_POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          ENV_BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
+          ENV_FRONTEND_PORT: ${{ secrets.FRONTEND_PORT }}
+          ENV_APP_ENV: ${{ secrets.APP_ENV }}
+          ENV_APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+          ENV_PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          ENV_STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+          ENV_STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          ENV_STRAVA_WEBHOOK_VERIFY_TOKEN: ${{ secrets.STRAVA_WEBHOOK_VERIFY_TOKEN }}
+          ENV_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ENV_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          ENV_TELEGRAM_ALLOWED_USER_ID: ${{ secrets.TELEGRAM_ALLOWED_USER_ID }}
+          ENV_TELEGRAM_WEBHOOK_URL: ${{ secrets.TELEGRAM_WEBHOOK_URL }}
+        run: |
+          ssh -t -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT }} -o StrictHostKeyChecking=no -o ServerAliveInterval=50 -o ServerAliveCountMax=10 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<EOF
+          set -euo pipefail
+
+          # Derive repo name from owner/repo (github.repository)
+          REPO_NAME="\$(basename "${GITHUB_REPOSITORY}")"
+          BRANCH="${DEPLOY_BRANCH}"
+
+          echo "::group::📦 Deployment Setup"
+          echo "Deploying branch: \${BRANCH}"
+          echo "Repository: \${REPO_NAME}"
+          echo "Changing directory to /srv/apps"
+          cd /srv/apps || { echo "Failed to change directory to /srv/apps"; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::🔄 Syncing Code"
+          if [ ! -d "\${REPO_NAME}/.git" ]; then
+            echo "Cloning fresh repository..."
+            rm -rf "\${REPO_NAME}" || true
+            mkdir -p "\${REPO_NAME}" || { echo "Failed to create project directory"; exit 1; }
+            cd "\${REPO_NAME}" || { echo "Failed to change directory to project directory"; exit 1; }
+            git clone -b \${BRANCH} https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git . || { echo "Failed to clone repository"; exit 1; }
+          else
+            echo "Updating existing repository..."
+            cd "\${REPO_NAME}" || { echo "Failed to change directory to project directory"; exit 1; }
+            git fetch origin || { echo "Failed to fetch from origin"; exit 1; }
+            git checkout \${BRANCH} || git checkout -b \${BRANCH} origin/\${BRANCH} || { echo "Failed to checkout branch"; exit 1; }
+            git reset --hard origin/\${BRANCH} || { echo "Failed to reset to origin/\${BRANCH}"; exit 1; }
+          fi
+          echo "✓ Code synced successfully"
+          echo "::endgroup::"
+
+          echo "::group::🔐 Setting up Environment"
+          echo "Creating .env file from CI/CD secrets..."
+          cat > .env << 'EOF_ENV'
+          POSTGRES_USER=${ENV_POSTGRES_USER}
+          POSTGRES_PASSWORD=${ENV_POSTGRES_PASSWORD}
+          POSTGRES_DB=${ENV_POSTGRES_DB}
+          POSTGRES_PORT=${ENV_POSTGRES_PORT}
+
+          BACKEND_PORT=${ENV_BACKEND_PORT}
+          FRONTEND_PORT=${ENV_FRONTEND_PORT}
+
+          APP_ENV=${ENV_APP_ENV}
+          APP_SECRET_KEY=${ENV_APP_SECRET_KEY}
+          PUBLIC_BASE_URL=${ENV_PUBLIC_BASE_URL}
+
+          STRAVA_CLIENT_ID=${ENV_STRAVA_CLIENT_ID}
+          STRAVA_CLIENT_SECRET=${ENV_STRAVA_CLIENT_SECRET}
+          STRAVA_WEBHOOK_VERIFY_TOKEN=${ENV_STRAVA_WEBHOOK_VERIFY_TOKEN}
+
+          TELEGRAM_BOT_TOKEN=${ENV_TELEGRAM_BOT_TOKEN}
+          TELEGRAM_WEBHOOK_SECRET=${ENV_TELEGRAM_WEBHOOK_SECRET}
+          TELEGRAM_ALLOWED_USER_ID=${ENV_TELEGRAM_ALLOWED_USER_ID}
+          TELEGRAM_WEBHOOK_URL=${ENV_TELEGRAM_WEBHOOK_URL}
+          EOF_ENV
+          echo "✓ Environment configured"
+          echo "::endgroup::"
+
+          echo "::group::🧹 Cleaning up old containers"
+          docker compose down --remove-orphans 2>&1 || true
+          docker image prune -a -f 2>&1 || true
+          docker builder prune -a -f 2>&1 || true
+          echo "✓ Cleanup complete"
+          echo "::endgroup::"
+
+          echo "::group::🔨 Building Docker Images"
+          docker compose build || { echo "::error::Docker build failed"; exit 1; }
+          echo "✓ Build complete"
+          echo "::endgroup::"
+
+          echo "::group::🚀 Starting Containers"
+          docker compose up -d --force-recreate || { echo "::error::Failed to start containers"; exit 1; }
+          echo "Waiting for containers to stabilize..."
+          sleep 5
+          echo "✓ Containers started"
+          echo "::endgroup::"
+
+          echo "::group::🗄️  Running Database Migrations"
+          docker compose exec -T api bash -c "cd /app && ./run_migrations.sh" || { echo "::error::Database migration failed"; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::✅ Deployment Status"
+          docker compose ps
+          echo "::endgroup::"
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✓ Deployment Complete!"
+          echo "✓ All migrations applied successfully"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          EOF

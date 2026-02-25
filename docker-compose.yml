@@ -1,0 +1,31 @@
+services:
+  api:
+    build:
+      context: ./backend
+    ports:
+      - "${BACKEND_PORT:-8002}:8000"
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3002}:80"
+    depends_on:
+      - api
+    restart: always
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    restart: always
+
+volumes:
+  postgres_data:
