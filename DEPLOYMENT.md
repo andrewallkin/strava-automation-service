@@ -77,6 +77,7 @@ server {
 | `STRAVA_CLIENT_ID`            | Strava app Client ID (from strava.com/settings/api)          |
 | `STRAVA_CLIENT_SECRET`        | Strava app Client Secret                                     |
 | `STRAVA_WEBHOOK_VERIFY_TOKEN` | Random token for Strava webhook verification                 |
+| `STRAVA_ALLOWED_ATHLETE_ID`   | Your Strava athlete ID (e.g. `14460791`) — restricts OAuth and webhook to this athlete only |
 | `TELEGRAM_BOT_TOKEN`          | Bot token from BotFather                                     |
 | `TELEGRAM_WEBHOOK_SECRET`     | Long random string for Telegram webhook path                 |
 | `TELEGRAM_ALLOWED_USER_ID`    | Your Telegram numeric user ID                                |
