@@ -1,0 +1,71 @@
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+from app.db import get_db
+from app.models import Gear, PendingActivity, User
+from app.services.activity_service import clear_pending_activity, log_event
+from app.services.strava_service import StravaService
+from app.services.telegram_service import TelegramService
+
+router = APIRouter(prefix="/api/telegram", tags=["telegram-webhook"])
+
+
+def _parse_callback_data(raw: str) -> tuple[int, str]:
+    # Expected format: a:<activity_id>:g:<gear_id>
+    parts = raw.split(":")
+    if len(parts) != 4 or parts[0] != "a" or parts[2] != "g":
+        raise ValueError("Invalid callback_data")
+    return int(parts[1]), parts[3]
+
+
+@router.post("/webhook/{secret}")
+async def telegram_webhook(
+    request: Request,
+    secret: str = Path(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    settings = get_settings()
+    if secret != settings.telegram_webhook_secret:
+        raise HTTPException(status_code=403, detail="Invalid webhook secret")
+
+    payload = await request.json()
+    callback = payload.get("callback_query")
+    if not callback:
+        return {"status": "ignored", "reason": "no callback_query"}
+
+    from_user = callback.get("from", {})
+    if settings.telegram_allowed_user_id and from_user.get("id") != settings.telegram_allowed_user_id:
+        raise HTTPException(status_code=403, detail="Unauthorized telegram user")
+
+    try:
+        activity_id, gear_id = _parse_callback_data(callback.get("data", ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    pending = db.scalar(select(PendingActivity).where(PendingActivity.activity_id == activity_id))
+    if not pending:
+        return {"status": "ignored", "reason": "no pending activity"}
+
+    strava = StravaService()
+    user = db.scalar(select(User).limit(1))
+    if not user:
+        raise HTTPException(status_code=400, detail="No authenticated Strava user available")
+    if not user.telegram_user_id:
+        user.telegram_user_id = from_user.get("id")
+        db.commit()
+
+    strava.update_activity(db, activity_id=activity_id, payload={"gear_id": gear_id}, user=user)
+    clear_pending_activity(db, activity_id)
+    TelegramService().answer_callback(callback_query_id=callback["id"], text="Gear updated")
+
+    gear_row = db.scalar(select(Gear).where(Gear.strava_gear_id == gear_id))
+    shoe_name = gear_row.name if gear_row else gear_id
+    chat_id = from_user.get("id") or user.telegram_user_id
+    if chat_id:
+        telegram = TelegramService()
+        telegram.send_message(chat_id, f"Nice one — {shoe_name} logged. Well done.")
+
+    log_event(db, "telegram_callback", "ok", "Gear updated from Telegram callback", payload)
+    return {"status": "updated", "activity_id": activity_id, "gear_id": gear_id}
