@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import httpx
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -38,8 +39,11 @@ class StravaService:
         )
         resp.raise_for_status()
         data = resp.json()
+        athlete_id = data.get("athlete", {}).get("id")
+        if self.settings.strava_allowed_athlete_id and athlete_id != self.settings.strava_allowed_athlete_id:
+            raise HTTPException(status_code=403, detail="Unauthorized athlete")
         user = self.get_or_create_user(db)
-        user.strava_athlete_id = data.get("athlete", {}).get("id")
+        user.strava_athlete_id = athlete_id
         user.access_token = data["access_token"]
         user.refresh_token = data["refresh_token"]
         user.expires_at = datetime.fromtimestamp(data["expires_at"], tz=timezone.utc)

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     strava_client_secret: str = ""
     strava_webhook_verify_token: str = ""
     strava_scopes: str = "activity:read,activity:write,profile:read_all"
+    strava_allowed_athlete_id: int = 0  # 0 = no restriction (backward compat)
 
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""

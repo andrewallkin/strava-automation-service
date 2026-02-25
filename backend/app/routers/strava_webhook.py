@@ -40,6 +40,12 @@ async def receive_webhook(
     if not activity_id:
         return {"status": "ignored", "reason": "missing object_id"}
 
+    settings = get_settings()
+    if settings.strava_allowed_athlete_id and (
+        owner_id is None or int(owner_id) != settings.strava_allowed_athlete_id
+    ):
+        return {"status": "ignored", "reason": "unauthorized_owner"}
+
     background_tasks.add_task(
         process_activity,
         int(activity_id),
