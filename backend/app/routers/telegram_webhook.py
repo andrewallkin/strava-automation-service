@@ -65,7 +65,21 @@ async def telegram_webhook(
     chat_id = from_user.get("id") or user.telegram_user_id
     if chat_id:
         telegram = TelegramService()
-        telegram.send_message(chat_id, f"Nice one — {shoe_name} logged. Well done.")
+        try:
+            activity_data = strava.get_activity(db, activity_id=activity_id, user=user)
+            activity_name = activity_data.get("name", "")
+            distance_m = activity_data.get("distance", 0) or 0
+            km_str = f"{distance_m / 1000:.2f}km" if distance_m else ""
+            if km_str:
+                confirmation = f"✅ {shoe_name} logged for your {km_str} run"
+                if activity_name:
+                    confirmation += f" \"{activity_name}\""
+                confirmation += "! 💪"
+            else:
+                confirmation = f"✅ {shoe_name} logged. Smashed it 💪"
+        except Exception:
+            confirmation = f"✅ {shoe_name} logged. Smashed it 💪"
+        telegram.send_message(chat_id, confirmation)
 
     log_event(db, "telegram_callback", "ok", "Gear updated from Telegram callback", payload)
     return {"status": "updated", "activity_id": activity_id, "gear_id": gear_id}

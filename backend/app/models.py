@@ -17,6 +17,8 @@ class User(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     run_shoe_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     gym_hide_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    athlete_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    athlete_profile_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Gear(Base):

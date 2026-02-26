@@ -2,6 +2,11 @@
 
 Instructions for AI agents working on this codebase.
 
+## Pull Requests
+
+- **PR titles must always start with** `feat:` or `refactor:` (e.g. `feat: add X`, `refactor: simplify Y`).
+- **PR descriptions must always be in-depth**: include a clear summary, detailed breakdown of changes by area, and rationale where relevant. Avoid one-line or minimal descriptions.
+
 ## Local Environment
 
 - **Never install anything on the host machine.** Do not run `npm install`, `pip install`, `poetry install`, or any other package manager on the user's local system.
