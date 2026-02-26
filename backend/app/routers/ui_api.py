@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import EventLog, PendingActivity, User
+from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
 
 router = APIRouter(prefix="/api/ui", tags=["ui"])
@@ -25,6 +26,8 @@ def status(db: Session = Depends(get_db)) -> dict:
     return {
         "connected": bool(user.strava_athlete_id),
         "strava_athlete_id": user.strava_athlete_id,
+        "athlete_name": user.athlete_name,
+        "athlete_profile_url": user.athlete_profile_url,
         "run_shoe_enabled": user.run_shoe_enabled,
         "gym_hide_enabled": user.gym_hide_enabled,
     }
@@ -110,3 +113,31 @@ def retry_activity(
         raise HTTPException(status_code=400, detail="Invalid activity ID")
     background_tasks.add_task(process_activity, activity_id, owner_id, 0)
     return {"status": "queued", "activity_id": activity_id}
+
+
+FEED_TYPES = {"Run", "VirtualRun", "TrailRun", "TreadmillRun", "TrackRun", "WeightTraining", "Workout"}
+
+
+@router.get("/activities")
+def activities(per_page: int = Query(default=30, le=50), db: Session = Depends(get_db)) -> list[dict]:
+    user = db.scalar(select(User).limit(1))
+    if not user or not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    strava = StravaService()
+    raw = strava.get_athlete_activities(db, user, per_page=per_page)
+    return [
+        {
+            "id": a["id"],
+            "name": a.get("name"),
+            "type": a.get("type") or a.get("sport_type"),
+            "sport_type": a.get("sport_type"),
+            "distance": a.get("distance"),
+            "moving_time": a.get("moving_time"),
+            "total_elevation_gain": a.get("total_elevation_gain"),
+            "average_heartrate": a.get("average_heartrate"),
+            "start_date": a.get("start_date"),
+            "start_date_local": a.get("start_date_local"),
+        }
+        for a in raw
+        if (a.get("type") or a.get("sport_type")) in FEED_TYPES
+    ]

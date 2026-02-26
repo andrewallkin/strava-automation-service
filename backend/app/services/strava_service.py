@@ -47,6 +47,11 @@ class StravaService:
         user.access_token = data["access_token"]
         user.refresh_token = data["refresh_token"]
         user.expires_at = datetime.fromtimestamp(data["expires_at"], tz=timezone.utc)
+        athlete = data.get("athlete", {})
+        user.athlete_name = (
+            f"{athlete.get('firstname', '')} {athlete.get('lastname', '')}".strip() or None
+        )
+        user.athlete_profile_url = athlete.get("profile")
         db.commit()
         db.refresh(user)
         return user
@@ -116,6 +121,17 @@ class StravaService:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def get_athlete_activities(self, db: Session, user: User, per_page: int = 30) -> list[dict]:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/athlete/activities",
+            headers=self._headers(user.access_token or ""),
+            params={"per_page": per_page},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
 
     def sync_gear_cache(self, db: Session, user: User) -> list[dict]:
         user = self.ensure_fresh_token(db, user)

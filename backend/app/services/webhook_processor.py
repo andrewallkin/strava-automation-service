@@ -46,6 +46,7 @@ def process_activity(activity_id: int, owner_id: int | None = None, attempt: int
                         chat_id=chat_id,
                         activity_id=activity_id,
                         shoes=shoes,
+                        activity=activity,
                     )
                     set_pending_activity(db, activity_id=activity_id, telegram_message_id=message_id)
                     log_event(

@@ -17,8 +17,22 @@ export type PendingActivity = {
 export type Status = {
   connected: boolean;
   strava_athlete_id?: number;
+  athlete_name: string | null;
+  athlete_profile_url: string | null;
   run_shoe_enabled: boolean;
   gym_hide_enabled: boolean;
+};
+
+export type StravaActivity = {
+  id: number;
+  name: string | null;
+  type: string | null;
+  sport_type: string | null;
+  distance: number | null;
+  moving_time: number | null;
+  total_elevation_gain: number | null;
+  average_heartrate: number | null;
+  start_date_local: string | null;
 };
 
 export type SettingsUpdate = {
@@ -80,6 +94,10 @@ export async function retryActivity(activityId: number): Promise<void> {
   if (!response.ok) {
     throw new Error(`Retry failed: ${response.status}`);
   }
+}
+
+export async function fetchActivities(): Promise<StravaActivity[]> {
+  return getJson<StravaActivity[]>("/ui/activities");
 }
 
 export async function disconnectStrava(): Promise<void> {
