@@ -130,48 +130,57 @@ jobs:
           docker compose ps
           echo "::endgroup::"
 
-          echo "::group::🔗 Registering Strava Webhook"
-          STRAVA_CALLBACK_URL="${ENV_PUBLIC_BASE_URL}/api/strava/webhook"
-          echo "Callback URL: \${STRAVA_CALLBACK_URL}"
-          EXISTING_JSON=\$(curl -sf "https://www.strava.com/api/v3/push_subscriptions?client_id=${ENV_STRAVA_CLIENT_ID}&client_secret=${ENV_STRAVA_CLIENT_SECRET}" || echo "[]")
-          EXISTING_ID=\$(echo "\${EXISTING_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if isinstance(d,list) and d else '')" 2>/dev/null || echo "")
-          EXISTING_CB=\$(echo "\${EXISTING_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['callback_url'] if isinstance(d,list) and d else '')" 2>/dev/null || echo "")
-          if [ -n "\${EXISTING_ID}" ] && [ "\${EXISTING_CB}" = "\${STRAVA_CALLBACK_URL}" ]; then
-            echo "✓ Webhook already registered (id=\${EXISTING_ID})"
-          else
-            if [ -n "\${EXISTING_ID}" ]; then
-              echo "Removing stale subscription (id=\${EXISTING_ID}, url=\${EXISTING_CB})..."
-              curl -sf -X DELETE "https://www.strava.com/api/v3/push_subscriptions/\${EXISTING_ID}?client_id=${ENV_STRAVA_CLIENT_ID}&client_secret=${ENV_STRAVA_CLIENT_SECRET}" || true
-            fi
-            echo "Creating webhook subscription..."
-            RESULT=\$(curl -sf -X POST https://www.strava.com/api/v3/push_subscriptions \
-              -F "client_id=${ENV_STRAVA_CLIENT_ID}" \
-              -F "client_secret=${ENV_STRAVA_CLIENT_SECRET}" \
-              -F "callback_url=\${STRAVA_CALLBACK_URL}" \
-              -F "verify_token=${ENV_STRAVA_WEBHOOK_VERIFY_TOKEN}" || echo "curl_failed")
-            if echo "\${RESULT}" | grep -q '"id"'; then
-              echo "✓ Webhook registered: \${RESULT}"
-            else
-              echo "⚠️  Webhook registration may have failed: \${RESULT}"
-            fi
-          fi
-          echo "::endgroup::"
-
-          echo "::group::🤖 Registering Telegram Webhook"
-          echo "Setting Telegram webhook..."
-          TRESULT=\$(curl -sf -X POST "https://api.telegram.org/bot${ENV_TELEGRAM_BOT_TOKEN}/setWebhook" \
-            -H "Content-Type: application/json" \
-            -d "{\"url\":\"${ENV_PUBLIC_BASE_URL}/api/telegram/webhook/${ENV_TELEGRAM_WEBHOOK_SECRET}\"}" || echo "curl_failed")
-          if echo "\${TRESULT}" | grep -q '"ok":true'; then
-            echo "✓ Telegram webhook registered"
-          else
-            echo "⚠️  Telegram webhook registration may have failed: \${TRESULT}"
-          fi
-          echo "::endgroup::"
-
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "✓ Deployment Complete!"
           echo "✓ All migrations applied successfully"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           EOF
+
+      - name: Register Webhooks
+        env:
+          ENV_PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          ENV_STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+          ENV_STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          ENV_STRAVA_WEBHOOK_VERIFY_TOKEN: ${{ secrets.STRAVA_WEBHOOK_VERIFY_TOKEN }}
+          ENV_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ENV_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+        run: |
+          echo "::group::🔗 Registering Strava Webhook"
+          STRAVA_CALLBACK_URL="${ENV_PUBLIC_BASE_URL}/api/strava/webhook"
+          echo "Callback URL: ${STRAVA_CALLBACK_URL}"
+          EXISTING_JSON=$(curl -sf "https://www.strava.com/api/v3/push_subscriptions?client_id=${ENV_STRAVA_CLIENT_ID}&client_secret=${ENV_STRAVA_CLIENT_SECRET}" || echo "[]")
+          EXISTING_ID=$(echo "${EXISTING_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if isinstance(d,list) and d else '')" 2>/dev/null || echo "")
+          EXISTING_CB=$(echo "${EXISTING_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['callback_url'] if isinstance(d,list) and d else '')" 2>/dev/null || echo "")
+          if [ -n "${EXISTING_ID}" ] && [ "${EXISTING_CB}" = "${STRAVA_CALLBACK_URL}" ]; then
+            echo "✓ Webhook already registered (id=${EXISTING_ID})"
+          else
+            if [ -n "${EXISTING_ID}" ]; then
+              echo "Removing stale subscription (id=${EXISTING_ID}, url=${EXISTING_CB})..."
+              curl -sf -X DELETE "https://www.strava.com/api/v3/push_subscriptions/${EXISTING_ID}?client_id=${ENV_STRAVA_CLIENT_ID}&client_secret=${ENV_STRAVA_CLIENT_SECRET}" || true
+            fi
+            echo "Creating webhook subscription..."
+            RESULT=$(curl -sf -X POST https://www.strava.com/api/v3/push_subscriptions \
+              -F "client_id=${ENV_STRAVA_CLIENT_ID}" \
+              -F "client_secret=${ENV_STRAVA_CLIENT_SECRET}" \
+              -F "callback_url=${STRAVA_CALLBACK_URL}" \
+              -F "verify_token=${ENV_STRAVA_WEBHOOK_VERIFY_TOKEN}" || echo "curl_failed")
+            if echo "${RESULT}" | grep -q '"id"'; then
+              echo "✓ Webhook registered: ${RESULT}"
+            else
+              echo "⚠️  Webhook registration may have failed: ${RESULT}"
+            fi
+          fi
+          echo "::endgroup::"
+
+          echo "::group::🤖 Registering Telegram Webhook"
+          echo "Setting Telegram webhook..."
+          TRESULT=$(curl -sf -X POST "https://api.telegram.org/bot${ENV_TELEGRAM_BOT_TOKEN}/setWebhook" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\":\"${ENV_PUBLIC_BASE_URL}/api/telegram/webhook/${ENV_TELEGRAM_WEBHOOK_SECRET}\"}" || echo "curl_failed")
+          if echo "${TRESULT}" | grep -q '"ok":true'; then
+            echo "✓ Telegram webhook registered"
+          else
+            echo "⚠️  Telegram webhook registration may have failed: ${TRESULT}"
+          fi
+          echo "::endgroup::"
