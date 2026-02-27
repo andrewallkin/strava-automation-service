@@ -117,6 +117,16 @@ export async function fetchActivities(): Promise<StravaActivity[]> {
   return getJson<StravaActivity[]>("/ui/activities");
 }
 
+export async function login(): Promise<boolean> {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    ...FETCH_OPTS,
+    method: "POST"
+  });
+  if (response.ok) return true;
+  if (response.status === 404) return false;
+  throw new Error(`Login failed: ${response.status}`);
+}
+
 export async function disconnectStrava(): Promise<void> {
   const response = await fetch(`${API_BASE}/auth/strava/disconnect`, {
     ...FETCH_OPTS,

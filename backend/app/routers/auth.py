@@ -11,7 +11,18 @@ from app.deps import require_session
 from app.models import User
 from app.services.strava_service import StravaService
 
+login_router = APIRouter(prefix="/api/auth", tags=["auth"])
 router = APIRouter(prefix="/api/auth/strava", tags=["auth"])
+
+
+@login_router.post("/login")
+def login(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Create session from existing user tokens. No OAuth needed if user already connected."""
+    user = db.scalar(select(User).where(User.strava_athlete_id.isnot(None), User.refresh_token.isnot(None)).limit(1))
+    if not user:
+        raise HTTPException(status_code=404, detail="No connected user")
+    request.session["connected"] = True
+    return {"ok": True}
 
 
 @router.get("/connect")

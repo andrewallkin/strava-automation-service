@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
-from app.routers.auth import router as auth_router
+from app.routers.auth import login_router, router as auth_router
 from app.routers.strava_webhook import router as strava_router
 from app.routers.telegram_webhook import router as telegram_router
 from app.routers.ui_api import router as ui_router
@@ -20,6 +20,7 @@ app.add_middleware(
     same_site="lax",
 )
 
+app.include_router(login_router)
 app.include_router(auth_router)
 app.include_router(strava_router)
 app.include_router(telegram_router)
