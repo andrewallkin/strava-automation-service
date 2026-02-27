@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.deps import require_session
 from app.models import EventLog, PendingActivity, User
 from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
@@ -19,7 +20,10 @@ class SettingsUpdate(BaseModel):
 
 
 @router.get("/status")
-def status(db: Session = Depends(get_db)) -> dict:
+def status(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_session),
+) -> dict:
     user = db.scalar(select(User).limit(1))
     if not user:
         raise HTTPException(status_code=404, detail="No user connected")
@@ -34,7 +38,11 @@ def status(db: Session = Depends(get_db)) -> dict:
 
 
 @router.patch("/settings")
-def update_settings(body: SettingsUpdate, db: Session = Depends(get_db)) -> dict:
+def update_settings(
+    body: SettingsUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_session),
+) -> dict:
     user = db.scalar(select(User).limit(1))
     if not user:
         raise HTTPException(status_code=404, detail="No user connected")
@@ -51,7 +59,10 @@ def update_settings(body: SettingsUpdate, db: Session = Depends(get_db)) -> dict
 
 
 @router.get("/summary")
-def summary(db: Session = Depends(get_db)) -> dict:
+def summary(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_session),
+) -> dict:
     pending = len(db.scalars(select(PendingActivity)).all())
     latest = db.scalar(select(EventLog).order_by(EventLog.created_at.desc()).limit(1))
     runs_updated = db.scalar(
@@ -74,7 +85,10 @@ def summary(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/pending")
-def pending(db: Session = Depends(get_db)) -> list[dict]:
+def pending(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_session),
+) -> list[dict]:
     rows = db.scalars(select(PendingActivity).order_by(PendingActivity.created_at.desc())).all()
     return [
         {
@@ -87,7 +101,11 @@ def pending(db: Session = Depends(get_db)) -> list[dict]:
 
 
 @router.get("/events")
-def events(limit: int = Query(default=50, le=200), db: Session = Depends(get_db)) -> list[dict]:
+def events(
+    limit: int = Query(default=50, le=200),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_session),
+) -> list[dict]:
     rows = db.scalars(select(EventLog).order_by(EventLog.created_at.desc()).limit(limit)).all()
     return [
         {
@@ -108,6 +126,7 @@ def retry_activity(
     activity_id: int,
     background_tasks: BackgroundTasks,
     owner_id: int | None = None,
+    _: None = Depends(require_session),
 ) -> dict:
     if activity_id < 1:
         raise HTTPException(status_code=400, detail="Invalid activity ID")
@@ -119,7 +138,11 @@ FEED_TYPES = {"Run", "VirtualRun", "TrailRun", "TreadmillRun", "TrackRun", "Weig
 
 
 @router.get("/activities")
-def activities(per_page: int = Query(default=30, le=50), db: Session = Depends(get_db)) -> list[dict]:
+def activities(
+    per_page: int = Query(default=30, le=50),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_session),
+) -> list[dict]:
     user = db.scalar(select(User).limit(1))
     if not user or not user.access_token:
         raise HTTPException(status_code=404, detail="No user connected")
