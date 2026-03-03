@@ -58,13 +58,8 @@ export function Login() {
             disabled={loading}
             className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 disabled:opacity-70 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-sm"
           >
-            {loading ? (
+            {loading && (
               <span className="h-5 w-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-            ) : (
-              <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116z" />
-                <path d="M11.233 13.828L9.145 9.705H6.08L11.233 19.88l5.153-10.175h-3.066l-2.087 4.123z" />
-              </svg>
             )}
             Continue with Strava
           </button>
