@@ -1,6 +1,5 @@
 from functools import lru_cache
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,11 +42,6 @@ class Settings(BaseSettings):
     frontend_base_url: str = ""
     ui_port: int = 3001
     ui_api_base_url: str = "/api"
-
-    tunnel_provider: str = "cloudflared"
-    ngrok_authtoken: str = ""
-    tunnel_domain: str = ""
-    cloudflared_tunnel_token: str = Field(default="", alias="CLOUDFLARED_TUNNEL_TOKEN")
 
     @property
     def database_url(self) -> str:

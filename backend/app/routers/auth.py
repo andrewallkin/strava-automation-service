@@ -42,7 +42,7 @@ def callback(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     settings = get_settings()
-    base_url = (settings.frontend_base_url or settings.public_base_url).rstrip("/") or "http://localhost"
+    base_url = (settings.frontend_base_url or settings.public_base_url).rstrip("/") or ""
     try:
         service = StravaService()
         user = service.exchange_code_for_token(db, code)
