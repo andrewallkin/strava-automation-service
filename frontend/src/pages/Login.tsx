@@ -1,8 +1,28 @@
+import { useState } from "react";
+import { login } from "../lib/api";
+
 export function Login() {
+  const [loading, setLoading] = useState(false);
   const params = new URLSearchParams(window.location.search);
   const error = params.get("strava") === "error"
     ? (params.get("message") ?? "Authentication failed. Please try again.")
     : null;
+
+  async function handleSignIn() {
+    setLoading(true);
+    try {
+      const ok = await login();
+      if (ok) {
+        window.location.href = "/";
+        return;
+      }
+      window.location.href = "/api/auth/strava/connect";
+    } catch {
+      window.location.href = "/api/auth/strava/connect";
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-gray-100 flex items-center justify-center px-4">
@@ -32,16 +52,17 @@ export function Login() {
           )}
 
           {/* Connect button */}
-          <a
-            href="/api/auth/strava/connect"
-            className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-lg transition-colors shadow-sm"
+          <button
+            type="button"
+            onClick={handleSignIn}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 disabled:opacity-70 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-sm"
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-              <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116z" />
-              <path d="M11.233 13.828L9.145 9.705H6.08L11.233 19.88l5.153-10.175h-3.066l-2.087 4.123z" />
-            </svg>
+            {loading && (
+              <span className="h-5 w-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            )}
             Continue with Strava
-          </a>
+          </button>
         </div>
       </div>
     </div>

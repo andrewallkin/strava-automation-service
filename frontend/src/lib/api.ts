@@ -1,5 +1,16 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+const FETCH_OPTS: RequestInit = { credentials: "include" };
+
+function handle401(response: Response, redirectOn401: boolean): void {
+  if (response.status === 401) {
+    if (redirectOn401) {
+      window.location.href = "/";
+    }
+    throw new Error("Unauthorized");
+  }
+}
+
 export type Summary = {
   pending_count: number;
   last_event_at: string | null;
@@ -50,8 +61,9 @@ export type EventRow = {
   created_at: string;
 };
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
+async function getJson<T>(path: string, redirectOn401 = true): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, FETCH_OPTS);
+  handle401(response, redirectOn401);
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
@@ -59,7 +71,8 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export async function fetchStatus(): Promise<Status | null> {
-  const response = await fetch(`${API_BASE}/ui/status`);
+  const response = await fetch(`${API_BASE}/ui/status`, FETCH_OPTS);
+  if (response.status === 401) return null;
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return (await response.json()) as Status;
@@ -67,10 +80,12 @@ export async function fetchStatus(): Promise<Status | null> {
 
 export async function updateSettings(settings: SettingsUpdate): Promise<Status> {
   const response = await fetch(`${API_BASE}/ui/settings`, {
+    ...FETCH_OPTS,
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(settings)
   });
+  handle401(response, true);
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return (await response.json()) as Status;
 }
@@ -89,22 +104,37 @@ export async function fetchEvents(): Promise<EventRow[]> {
 
 export async function retryActivity(activityId: number): Promise<void> {
   const response = await fetch(`${API_BASE}/ui/retry/${activityId}`, {
+    ...FETCH_OPTS,
     method: "POST"
   });
+  handle401(response, true);
   if (!response.ok) {
     throw new Error(`Retry failed: ${response.status}`);
   }
 }
 
-export async function fetchActivities(): Promise<StravaActivity[]> {
-  return getJson<StravaActivity[]>("/ui/activities");
+export async function fetchActivities(page = 1): Promise<StravaActivity[]> {
+  const params = new URLSearchParams({ page: String(page), per_page: "15" });
+  return getJson<StravaActivity[]>(`/ui/activities?${params}`);
 }
 
-export async function disconnectStrava(): Promise<void> {
-  const response = await fetch(`${API_BASE}/auth/strava/disconnect`, {
-    method: "DELETE"
+export async function login(): Promise<boolean> {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    ...FETCH_OPTS,
+    method: "POST"
   });
+  if (response.ok) return true;
+  if (response.status === 401 || response.status === 404) return false;
+  throw new Error(`Login failed: ${response.status}`);
+}
+
+export async function logout(): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/logout`, {
+    ...FETCH_OPTS,
+    method: "POST"
+  });
+  handle401(response, true);
   if (!response.ok) {
-    throw new Error(`Disconnect failed: ${response.status}`);
+    throw new Error(`Logout failed: ${response.status}`);
   }
 }

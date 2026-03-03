@@ -4,10 +4,10 @@ import {
   PendingActivity,
   Status,
   Summary,
-  disconnectStrava,
   fetchEvents,
   fetchPending,
   fetchSummary,
+  logout,
   retryActivity,
   updateSettings
 } from "../lib/api";
@@ -97,12 +97,12 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
     }
   };
 
-  const handleDisconnect = async () => {
+  const handleLogout = async () => {
     try {
-      await disconnectStrava();
+      await logout();
       onStatusChange(null);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to disconnect");
+      setMessage(err instanceof Error ? err.message : "Failed to logout");
     }
   };
 
@@ -119,7 +119,7 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
             </span>
           </div>
 
-          {/* Right: profile pic, name, disconnect */}
+          {/* Right: profile pic, name, logout */}
           <div className="flex items-center gap-3">
             {localStatus.athlete_profile_url && (
               <img
@@ -135,10 +135,10 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
             )}
             <button
               type="button"
-              onClick={handleDisconnect}
+              onClick={handleLogout}
               className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
             >
-              Disconnect
+              Logout
             </button>
           </div>
         </div>

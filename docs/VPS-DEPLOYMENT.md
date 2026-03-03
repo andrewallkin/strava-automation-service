@@ -90,6 +90,7 @@ STRAVA_CLIENT_ID=<your_client_id>
 STRAVA_CLIENT_SECRET=<your_client_secret>
 STRAVA_WEBHOOK_VERIFY_TOKEN=<random_string_you_invent>
 STRAVA_SCOPES=activity:read,activity:write,profile:read_all
+STRAVA_ALLOWED_ATHLETE_ID=<your_strava_athlete_id>
 
 # Telegram
 TELEGRAM_BOT_TOKEN=<your_bot_token>
@@ -99,12 +100,16 @@ TELEGRAM_WEBHOOK_URL=https://yourdomain.com/api/telegram/webhook/<same_value_as_
 
 # Security
 APP_SECRET_KEY=<32_plus_random_characters>
+JWT_SECRET=<32_plus_random_characters>
+JWT_EXP_MINUTES=30
+JWT_COOKIE_SECURE=true
 ```
 
 ### Optional values
 
 - **`FRONTEND_BASE_URL`** — Where the browser is redirected after Strava OAuth. Defaults to `PUBLIC_BASE_URL` if unset. Set this if your frontend is served on a different subdomain than the API.
 - **Tunnel vars** (`TUNNEL_PROVIDER`, `CLOUDFLARED_TUNNEL_TOKEN`, `NGROK_AUTHTOKEN`, `TUNNEL_DOMAIN`) — Not used in production. Remove or leave blank.
+- **JWT expiry** — Set `JWT_EXP_MINUTES=30` for production.
 
 > **Note on `STRAVA_WEBHOOK_CALLBACK_URL`:** This variable no longer exists in config. The webhook URL is auto-derived from `PUBLIC_BASE_URL` by the `register-webhooks.sh` script.
 
@@ -203,9 +208,11 @@ You only need to run this once. Webhooks remain registered until you explicitly 
 
 ---
 
-## 10. Connect Strava (One-Time OAuth)
+## 10. Connect Strava (OAuth Login)
 
-Open `https://yourdomain.com/` in your browser and click **Connect with Strava**. Complete the OAuth flow. Your tokens are stored in the postgres container's persistent volume and will survive restarts.
+Open `https://yourdomain.com/` in your browser and click **Continue with Strava**. Login always starts the OAuth redirect flow. If your Strava browser session is still active and your app is already authorized, Strava usually redirects back immediately without showing consent again.
+
+Your Strava tokens are stored in the postgres container's persistent volume and survive restarts. App logout only clears the app JWT cookie; it does not revoke Strava authorization.
 
 ---
 

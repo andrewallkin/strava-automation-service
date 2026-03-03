@@ -11,16 +11,25 @@ import {
   retryActivity
 } from "../lib/api";
 
+const DATE_OPTS: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false
+};
+
 function formatDate(value: string | null): string {
   if (!value) return "-";
-  return new Date(value).toLocaleString("en-ZA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  });
+  return new Date(value).toLocaleString("en-ZA", DATE_OPTS);
+}
+
+/** Strava start_date_local is local time but API incorrectly adds Z. Strip Z so JS parses as local. */
+function formatLocalDate(value: string | null): string {
+  if (!value) return "-";
+  const localStr = value.replace(/Z$/i, "");
+  return new Date(localStr).toLocaleString("en-ZA", DATE_OPTS);
 }
 
 function formatEventType(eventType: string): string {
@@ -85,7 +94,7 @@ function ActivityCard({ activity }: { activity: StravaActivity }) {
             {activity.name ?? (isRun ? "Run" : "Workout")}
           </p>
           <p className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
-            {activity.start_date_local ? formatDate(activity.start_date_local) : ""}
+            {activity.start_date_local ? formatLocalDate(activity.start_date_local) : ""}
           </p>
         </div>
         {isRun && (distanceKm || duration) && (
@@ -117,15 +126,38 @@ function ActivityFeedSkeleton() {
   );
 }
 
+const ACTIVITIES_PAGE_SIZE = 15;
+
 export function ActivityFeed() {
   const [activities, setActivities] = useState<StravaActivity[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    fetchActivities()
-      .then(setActivities)
+    fetchActivities(1)
+      .then((data) => {
+        setActivities(data);
+        setPage(1);
+        setHasMore(data.length >= ACTIVITIES_PAGE_SIZE);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
   }, []);
+
+  async function loadMore() {
+    if (loadingMore || !hasMore || activities === null) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const data = await fetchActivities(nextPage);
+      setActivities((prev) => (prev ? [...prev, ...data] : data));
+      setPage(nextPage);
+      setHasMore(data.length >= ACTIVITIES_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -140,11 +172,25 @@ export function ActivityFeed() {
       ) : activities.length === 0 ? (
         <p className="px-5 py-4 text-sm text-gray-500">No activities yet.</p>
       ) : (
-        <div className="divide-y divide-gray-100">
-          {activities.map((a) => (
-            <ActivityCard key={a.id} activity={a} />
-          ))}
-        </div>
+        <>
+          <div className="divide-y divide-gray-100">
+            {activities.map((a) => (
+              <ActivityCard key={a.id} activity={a} />
+            ))}
+          </div>
+          {hasMore && (
+            <div className="px-5 py-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="w-full py-2 text-sm font-medium text-orange-600 hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? "Loading…" : "View more"}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -165,8 +211,11 @@ export function StatsGrid({ summary }: { summary: Summary | null }) {
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gym hidden</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{summary?.gym_hidden ?? "-"}</p>
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last event</p>
+      <div
+        className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3"
+        title="When the automation last processed something (webhook, run update, gym hide, etc.)"
+      >
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last automation</p>
         <p className="mt-1 text-xs font-semibold text-gray-900 leading-tight">
           {formatDate(summary?.last_event_at ?? null)}
         </p>

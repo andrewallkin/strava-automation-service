@@ -27,6 +27,11 @@ class StravaService:
         return user
 
     def exchange_code_for_token(self, db: Session, code: str) -> User:
+        if not self.settings.strava_allowed_athlete_id:
+            raise HTTPException(
+                status_code=500,
+                detail="STRAVA_ALLOWED_ATHLETE_ID must be configured for single-user mode",
+            )
         resp = httpx.post(
             f"{STRAVA_BASE_URL}/oauth/token",
             data={
@@ -40,7 +45,7 @@ class StravaService:
         resp.raise_for_status()
         data = resp.json()
         athlete_id = data.get("athlete", {}).get("id")
-        if self.settings.strava_allowed_athlete_id and athlete_id != self.settings.strava_allowed_athlete_id:
+        if athlete_id != self.settings.strava_allowed_athlete_id:
             raise HTTPException(status_code=403, detail="Unauthorized athlete")
         user = self.get_or_create_user(db)
         user.strava_athlete_id = athlete_id
@@ -93,7 +98,7 @@ class StravaService:
             f"?client_id={self.settings.strava_client_id}"
             "&response_type=code"
             f"&redirect_uri={redirect_uri}"
-            "&approval_prompt=force"
+            "&approval_prompt=auto"
             "&scope="
             f"{scope}"
         )
@@ -122,12 +127,14 @@ class StravaService:
         resp.raise_for_status()
         return resp.json()
 
-    def get_athlete_activities(self, db: Session, user: User, per_page: int = 30) -> list[dict]:
+    def get_athlete_activities(
+        self, db: Session, user: User, per_page: int = 30, page: int = 1
+    ) -> list[dict]:
         user = self.ensure_fresh_token(db, user)
         resp = httpx.get(
             f"{STRAVA_BASE_URL}/api/v3/athlete/activities",
             headers=self._headers(user.access_token or ""),
-            params={"per_page": per_page},
+            params={"per_page": per_page, "page": page},
             timeout=20,
         )
         resp.raise_for_status()
