@@ -73,6 +73,9 @@ server {
 | `FRONTEND_PORT`               | `3002`                                                       |
 | `APP_ENV`                     | `production`                                                 |
 | `APP_SECRET_KEY`              | Random 32+ character secret string                           |
+| `JWT_SECRET`                  | Random 32+ character secret string (can reuse `APP_SECRET_KEY`) |
+| `JWT_EXP_MINUTES`             | `2` for initial VPS testing, then `30` for production        |
+| `JWT_COOKIE_SECURE`           | `true` (required over HTTPS)                                 |
 | `PUBLIC_BASE_URL`             | `https://strava.yourdomain.com`                              |
 | `STRAVA_CLIENT_ID`            | Strava app Client ID (from strava.com/settings/api)          |
 | `STRAVA_CLIENT_SECRET`        | Strava app Client Secret                                     |
@@ -89,6 +92,12 @@ server {
 2. Push to `main` or trigger manually via Actions → Deploy to VPS → Run workflow.
 3. Monitor the Actions tab for successful completion.
 4. SSH to VPS and verify: `cd /srv/apps/strava-automation-service && docker compose ps`
+
+### JWT rollout
+
+- Keep `JWT_EXP_MINUTES=2` during initial VPS auth-flow testing.
+- After validating login/logout/expiry behavior end-to-end, switch to `JWT_EXP_MINUTES=30`.
+- Keep `STRAVA_ALLOWED_ATHLETE_ID` set in all environments to block non-owner access.
 
 ## Post-Deployment: Webhook Registration
 

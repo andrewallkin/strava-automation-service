@@ -1,28 +1,18 @@
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.deps import require_session
+from app.deps import require_jwt_user
 from app.models import User
+from app.services.jwt_service import JwtService
 from app.services.strava_service import StravaService
 
-login_router = APIRouter(prefix="/api/auth", tags=["auth"])
 router = APIRouter(prefix="/api/auth/strava", tags=["auth"])
-
-
-@login_router.post("/login")
-def login(request: Request, db: Session = Depends(get_db)) -> dict:
-    """Create session from existing user tokens. No OAuth needed if user already connected."""
-    user = db.scalar(select(User).where(User.strava_athlete_id.isnot(None), User.refresh_token.isnot(None)).limit(1))
-    if not user:
-        raise HTTPException(status_code=404, detail="No connected user")
-    request.session["connected"] = True
-    return {"ok": True}
+logout_router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.get("/connect")
@@ -33,7 +23,6 @@ def connect() -> RedirectResponse:
 
 @router.get("/callback")
 def callback(
-    request: Request,
     code: str = Query(...),
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
@@ -41,28 +30,37 @@ def callback(
     base_url = (settings.frontend_base_url or settings.public_base_url).rstrip("/") or "http://localhost"
     try:
         service = StravaService()
-        service.exchange_code_for_token(db, code)
+        user = service.exchange_code_for_token(db, code)
+    except HTTPException:
+        raise
     except Exception as exc:  # pragma: no cover - passthrough error handling
         params = urlencode({"strava": "error", "message": str(exc)[:200]})
         return RedirectResponse(url=f"{base_url}/?{params}")
 
-    request.session["connected"] = True
-    return RedirectResponse(url=f"{base_url}/?strava=connected")
+    response = RedirectResponse(url=f"{base_url}/?strava=connected")
+    jwt_service = JwtService()
+    jwt_service.set_auth_cookie(response, jwt_service.issue_token(user))
+    return response
+
+
+@logout_router.post("/logout")
+def logout(response: Response) -> dict:
+    jwt_service = JwtService()
+    jwt_service.clear_auth_cookie(response)
+    return {"logged_out": True}
 
 
 @router.delete("/disconnect")
-def disconnect(
-    request: Request,
+def disconnect_strava(
+    response: Response,
     db: Session = Depends(get_db),
-    _: None = Depends(require_session),
+    user: User = Depends(require_jwt_user),
 ) -> dict:
-    user = db.execute(select(User).limit(1)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="No user found")
     user.strava_athlete_id = None
     user.access_token = None
     user.refresh_token = None
     user.expires_at = None
     db.commit()
-    request.session.clear()
+    jwt_service = JwtService()
+    jwt_service.clear_auth_cookie(response)
     return {"disconnected": True}

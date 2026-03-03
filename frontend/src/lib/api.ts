@@ -113,27 +113,18 @@ export async function retryActivity(activityId: number): Promise<void> {
   }
 }
 
-export async function fetchActivities(): Promise<StravaActivity[]> {
-  return getJson<StravaActivity[]>("/ui/activities");
+export async function fetchActivities(page = 1): Promise<StravaActivity[]> {
+  const params = new URLSearchParams({ page: String(page), per_page: "15" });
+  return getJson<StravaActivity[]>(`/ui/activities?${params}`);
 }
 
-export async function login(): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/auth/login`, {
+export async function logout(): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/logout`, {
     ...FETCH_OPTS,
     method: "POST"
   });
-  if (response.ok) return true;
-  if (response.status === 404) return false;
-  throw new Error(`Login failed: ${response.status}`);
-}
-
-export async function disconnectStrava(): Promise<void> {
-  const response = await fetch(`${API_BASE}/auth/strava/disconnect`, {
-    ...FETCH_OPTS,
-    method: "DELETE"
-  });
   handle401(response, true);
   if (!response.ok) {
-    throw new Error(`Disconnect failed: ${response.status}`);
+    throw new Error(`Logout failed: ${response.status}`);
   }
 }

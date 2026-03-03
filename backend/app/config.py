@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     telegram_webhook_url: str = ""
 
     app_secret_key: str = ""
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_exp_minutes: int = 2
+    jwt_cookie_name: str = "strava_auth"
+    jwt_cookie_secure: bool = True
+    jwt_cookie_samesite: str = "lax"
+    jwt_cookie_domain: str = ""
 
     public_base_url: str = ""
     frontend_base_url: str = ""
