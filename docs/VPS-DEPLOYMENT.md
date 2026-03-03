@@ -101,7 +101,7 @@ TELEGRAM_WEBHOOK_URL=https://yourdomain.com/api/telegram/webhook/<same_value_as_
 # Security
 APP_SECRET_KEY=<32_plus_random_characters>
 JWT_SECRET=<32_plus_random_characters>
-JWT_EXP_MINUTES=2
+JWT_EXP_MINUTES=30
 JWT_COOKIE_SECURE=true
 ```
 
@@ -109,7 +109,7 @@ JWT_COOKIE_SECURE=true
 
 - **`FRONTEND_BASE_URL`** — Where the browser is redirected after Strava OAuth. Defaults to `PUBLIC_BASE_URL` if unset. Set this if your frontend is served on a different subdomain than the API.
 - **Tunnel vars** (`TUNNEL_PROVIDER`, `CLOUDFLARED_TUNNEL_TOKEN`, `NGROK_AUTHTOKEN`, `TUNNEL_DOMAIN`) — Not used in production. Remove or leave blank.
-- **JWT testing/prod cutover** — Keep `JWT_EXP_MINUTES=2` while validating auth on VPS, then change to `JWT_EXP_MINUTES=30` for production.
+- **JWT expiry** — Set `JWT_EXP_MINUTES=30` for production.
 
 > **Note on `STRAVA_WEBHOOK_CALLBACK_URL`:** This variable no longer exists in config. The webhook URL is auto-derived from `PUBLIC_BASE_URL` by the `register-webhooks.sh` script.
 

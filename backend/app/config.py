@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     app_secret_key: str = ""
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    jwt_exp_minutes: int = 2
+    jwt_exp_minutes: int = 30
     jwt_cookie_name: str = "strava_auth"
     jwt_cookie_secure: bool = True
     jwt_cookie_samesite: str = "lax"
