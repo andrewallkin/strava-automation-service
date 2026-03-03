@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -13,6 +14,20 @@ from app.services.strava_service import StravaService
 
 router = APIRouter(prefix="/api/auth/strava", tags=["auth"])
 logout_router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+@logout_router.post("/login")
+def login(response: Response, db: Session = Depends(get_db)) -> dict:
+    settings = get_settings()
+    user = db.scalar(select(User).where(User.strava_athlete_id.isnot(None), User.refresh_token.isnot(None)).limit(1))
+    if not user:
+        raise HTTPException(status_code=404, detail="No connected user")
+    if settings.strava_allowed_athlete_id and user.strava_athlete_id != settings.strava_allowed_athlete_id:
+        raise HTTPException(status_code=401, detail="Unauthorized athlete")
+
+    jwt_service = JwtService()
+    jwt_service.set_auth_cookie(response, jwt_service.issue_token(user))
+    return {"ok": True}
 
 
 @router.get("/connect")

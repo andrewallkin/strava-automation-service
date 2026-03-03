@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { login } from "../lib/api";
 
 export function Login() {
   const [loading, setLoading] = useState(false);
@@ -7,9 +8,20 @@ export function Login() {
     ? (params.get("message") ?? "Authentication failed. Please try again.")
     : null;
 
-  function handleSignIn() {
+  async function handleSignIn() {
     setLoading(true);
-    window.location.href = "/api/auth/strava/connect";
+    try {
+      const ok = await login();
+      if (ok) {
+        window.location.href = "/";
+        return;
+      }
+      window.location.href = "/api/auth/strava/connect";
+    } catch {
+      window.location.href = "/api/auth/strava/connect";
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
