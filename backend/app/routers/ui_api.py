@@ -206,8 +206,11 @@ def weekly_summary(
     activities = strava.get_activities_since(db, user, after_epoch, max_pages=2)
     runs = [a for a in activities if (a.get("sport_type") or a.get("type")) in RUN_SPORT_TYPES]
 
+    def empty_day() -> dict:
+        return {"km": 0.0, "moving_time_s": 0, "elevation_m": 0.0, "count": 0, "activities": []}
+
     def empty_week() -> dict:
-        return {"total_km": 0.0, "run_count": 0, "elevation_m": 0.0, "days": [0.0] * 7}
+        return {"total_km": 0.0, "run_count": 0, "elevation_m": 0.0, "days": [empty_day() for _ in range(7)]}
 
     this_week = empty_week()
     last_week = empty_week()
@@ -222,6 +225,7 @@ def weekly_summary(
             continue
         km = (a.get("distance") or 0) / 1000
         elev = a.get("total_elevation_gain") or 0
+        moving_time = a.get("moving_time") or 0
         if act_date >= monday_this:
             bucket = this_week
         elif act_date >= monday_last:
@@ -231,14 +235,26 @@ def weekly_summary(
         bucket["total_km"] += km
         bucket["run_count"] += 1
         bucket["elevation_m"] += elev
-        bucket["days"][act_date.weekday()] += km
+        day = bucket["days"][act_date.weekday()]
+        day["km"] += km
+        day["moving_time_s"] += moving_time
+        day["elevation_m"] += elev
+        day["count"] += 1
+        day["activities"].append({
+            "name": a.get("name") or "Run",
+            "km": round(km, 2),
+            "moving_time_s": moving_time,
+            "elevation_m": round(elev),
+        })
 
     this_week["total_km"] = round(this_week["total_km"], 2)
     last_week["total_km"] = round(last_week["total_km"], 2)
     this_week["elevation_m"] = round(this_week["elevation_m"])
     last_week["elevation_m"] = round(last_week["elevation_m"])
-    this_week["days"] = [round(d, 2) for d in this_week["days"]]
-    last_week["days"] = [round(d, 2) for d in last_week["days"]]
+    for week in [this_week, last_week]:
+        for day in week["days"]:
+            day["km"] = round(day["km"], 2)
+            day["elevation_m"] = round(day["elevation_m"])
 
     return {"this_week": this_week, "last_week": last_week}
 

@@ -127,11 +127,26 @@ export type ShoeVaultEntry = {
   model_name: string | null;
 };
 
+export type DayActivity = {
+  name: string;
+  km: number;
+  moving_time_s: number;
+  elevation_m: number;
+};
+
+export type DayStats = {
+  km: number;
+  moving_time_s: number;
+  elevation_m: number;
+  count: number;
+  activities: DayActivity[];
+};
+
 export type WeekStats = {
   total_km: number;
   run_count: number;
   elevation_m: number;
-  days: number[];
+  days: DayStats[];
 };
 
 export type WeeklySummary = {

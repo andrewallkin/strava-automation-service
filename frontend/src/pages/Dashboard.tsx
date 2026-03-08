@@ -383,6 +383,24 @@ export function ShoeVault() {
   );
 }
 
+function formatRunDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  if (mins >= 60) {
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return `${hrs}h ${String(rem).padStart(2, "0")}m`;
+  }
+  return `${mins}m`;
+}
+
+function formatRunPace(km: number, seconds: number): string {
+  if (!km || !seconds) return "";
+  const paceSecPerKm = seconds / km;
+  const paceMin = Math.floor(paceSecPerKm / 60);
+  const paceSec = Math.floor(paceSecPerKm % 60);
+  return `${paceMin}:${String(paceSec).padStart(2, "0")}/km`;
+}
+
 export function WeeklyTrainingSummary() {
   const [data, setData] = useState<WeeklySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -403,7 +421,7 @@ export function WeeklyTrainingSummary() {
     return <span className="text-gray-400 text-xs">—</span>;
   }
 
-  const maxKm = data ? Math.max(...data.this_week.days, 0.1) : 1;
+  const maxKm = data ? Math.max(...data.this_week.days.map((d) => d.km), 0.1) : 1;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -441,13 +459,18 @@ export function WeeklyTrainingSummary() {
               </div>
             </div>
           </div>
+
+          {/* Bar chart */}
           <div>
-            <div className="flex items-end gap-1 h-10">
-              {data.this_week.days.map((km, i) => (
-                <div key={i} className="flex-1 flex flex-col justify-end">
+            <div className="flex items-end gap-1 h-16">
+              {data.this_week.days.map((day, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center justify-end">
+                  {day.km > 0 && (
+                    <span className="text-[10px] text-gray-500 mb-0.5">{day.km.toFixed(1)}</span>
+                  )}
                   <div
-                    className="bg-orange-400 rounded-t"
-                    style={{ height: `${km > 0 ? Math.max((km / maxKm) * 40, 3) : 0}px` }}
+                    className="w-full bg-orange-400 rounded-t"
+                    style={{ height: `${day.km > 0 ? Math.max((day.km / maxKm) * 40, 3) : 0}px` }}
                   />
                 </div>
               ))}
@@ -458,6 +481,26 @@ export function WeeklyTrainingSummary() {
               ))}
             </div>
           </div>
+
+          {/* Per-day activity details */}
+          {data.this_week.days.some((d) => d.count > 0) && (
+            <div className="space-y-1.5 pt-1 border-t border-gray-100">
+              {data.this_week.days.map((day, i) =>
+                day.activities.map((act, j) => (
+                  <div key={`${i}-${j}`} className="flex items-center gap-2 text-xs">
+                    <span className="w-4 text-gray-400 font-medium">{DAY_LABELS[i]}</span>
+                    <span className="text-gray-900 font-medium truncate flex-1">{act.name}</span>
+                    <span className="text-gray-600">{act.km.toFixed(1)} km</span>
+                    <span className="text-gray-500">{formatRunDuration(act.moving_time_s)}</span>
+                    <span className="text-gray-500">{formatRunPace(act.km, act.moving_time_s)}</span>
+                    {act.elevation_m > 0 && (
+                      <span className="text-gray-400">⛰ {act.elevation_m}m</span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
