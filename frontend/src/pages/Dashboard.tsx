@@ -427,7 +427,7 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-200${className ? ` ${className}` : ""}`}>
       <div className="px-5 py-4 border-b border-gray-100">
-        <h2 className="text-base font-semibold text-gray-900">Weekly Running</h2>
+        <h2 className="text-base font-semibold text-gray-900">🏃 Weekly Running</h2>
         <p className="text-xs text-gray-500 mt-0.5">This week vs last week</p>
       </div>
       {data === null ? (
@@ -439,21 +439,21 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
         <div className="px-5 py-4 space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="text-center">
-              <p className="text-xs text-gray-500">km</p>
+              <p className="text-xs text-gray-500">📏 km</p>
               <div className="flex items-center justify-center gap-1">
                 <p className="text-lg font-bold text-gray-900">{data.this_week.total_km.toFixed(1)}</p>
                 <Trend thisVal={data.this_week.total_km} lastVal={data.last_week.total_km} />
               </div>
             </div>
             <div className="text-center">
-              <p className="text-xs text-gray-500">runs</p>
+              <p className="text-xs text-gray-500">🏅 runs</p>
               <div className="flex items-center justify-center gap-1">
                 <p className="text-lg font-bold text-gray-900">{data.this_week.run_count}</p>
                 <Trend thisVal={data.this_week.run_count} lastVal={data.last_week.run_count} />
               </div>
             </div>
             <div className="text-center">
-              <p className="text-xs text-gray-500">elev</p>
+              <p className="text-xs text-gray-500">⛰️ elev</p>
               <div className="flex items-center justify-center gap-1">
                 <p className="text-lg font-bold text-gray-900">{data.this_week.elevation_m}m</p>
                 <Trend thisVal={data.this_week.elevation_m} lastVal={data.last_week.elevation_m} />
@@ -485,21 +485,33 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
 
           {/* Per-day activity details */}
           {data.this_week.days.some((d) => d.count > 0) && (
-            <div className="space-y-1.5 pt-1 border-t border-gray-100">
-              {data.this_week.days.map((day, i) =>
-                day.activities.map((act, j) => (
-                  <div key={`${i}-${j}`} className="flex items-center gap-2 text-xs">
-                    <span className="w-20 text-gray-400 font-medium flex-shrink-0">{FULL_DAY_NAMES[i]}</span>
-                    <span className="text-gray-900 font-medium truncate flex-1">{act.name}</span>
-                    <span className="text-gray-600">{act.km.toFixed(1)} km</span>
-                    <span className="text-gray-500">{formatRunDuration(act.moving_time_s)}</span>
-                    <span className="text-gray-500">{formatRunPace(act.km, act.moving_time_s)}</span>
-                    {act.elevation_m > 0 && (
-                      <span className="text-gray-400">⛰ {act.elevation_m}m</span>
-                    )}
-                  </div>
-                ))
-              )}
+            <div className="pt-1 border-t border-gray-100">
+              {/* Column headers */}
+              <div className="grid grid-cols-[5rem_1fr_3.5rem_3rem_4rem_3rem] gap-x-2 px-1 pb-1 text-[10px] font-medium text-gray-400 uppercase tracking-wide">
+                <span>Day</span>
+                <span>Activity</span>
+                <span className="text-right">📏 km</span>
+                <span className="text-right">⏱ time</span>
+                <span className="text-right">⚡ pace</span>
+                <span className="text-right">⛰ elev</span>
+              </div>
+              <div className="space-y-1">
+                {data.this_week.days.map((day, i) =>
+                  day.activities.map((act, j) => (
+                    <div
+                      key={`${i}-${j}`}
+                      className="grid grid-cols-[5rem_1fr_3.5rem_3rem_4rem_3rem] gap-x-2 items-center px-1 py-1 rounded-lg bg-gray-50 text-xs"
+                    >
+                      <span className="text-gray-400 font-medium">{FULL_DAY_NAMES[i]}</span>
+                      <span className="text-gray-900 font-medium truncate">{act.name}</span>
+                      <span className="text-right text-orange-600 font-semibold">{act.km.toFixed(1)}</span>
+                      <span className="text-right text-gray-600">{formatRunDuration(act.moving_time_s)}</span>
+                      <span className="text-right text-blue-600 font-medium">{formatRunPace(act.km, act.moving_time_s)}</span>
+                      <span className="text-right text-gray-500">{act.elevation_m > 0 ? `${act.elevation_m}m` : "—"}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>
