@@ -361,11 +361,6 @@ export function ShoeVault() {
               <div key={shoe.strava_gear_id} className="px-5 py-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm font-medium text-gray-900 truncate">{shoe.name}</span>
-                  {shoe.is_default && (
-                    <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                      default
-                    </span>
-                  )}
                   {nearRetirement && (
                     <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
                       near retirement

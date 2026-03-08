@@ -320,6 +320,67 @@ def streak(
     }
 
 
+@router.get("/gym-summary")
+def gym_summary(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    today = date.today()
+    jan1 = today.replace(month=1, day=1)
+    after_epoch = int((jan1 - date(1970, 1, 1)).total_seconds())
+    strava = StravaService()
+    activities = strava.get_activities_since(db, user, after_epoch, max_pages=10)
+    gym_acts = [
+        a for a in activities
+        if (a.get("sport_type") or a.get("type")) in GYM_SPORT_TYPES
+    ]
+
+    monday_this = today - timedelta(days=today.weekday())
+    monday_last = monday_this - timedelta(weeks=1)
+
+    this_week = {"count": 0, "duration_s": 0}
+    last_week = {"count": 0, "duration_s": 0}
+    year_total = 0
+    month_buckets: dict[str, dict] = {}
+
+    for a in gym_acts:
+        raw_date = (a.get("start_date_local") or a.get("start_date") or "")[:10]
+        if not raw_date:
+            continue
+        try:
+            act_date = date.fromisoformat(raw_date)
+        except ValueError:
+            continue
+        duration = a.get("moving_time") or a.get("elapsed_time") or 0
+        year_total += 1
+        month_key = act_date.strftime("%b")
+        month_num = act_date.month
+        if month_key not in month_buckets:
+            month_buckets[month_key] = {"month": month_key, "count": 0, "duration_s": 0, "_num": month_num}
+        month_buckets[month_key]["count"] += 1
+        month_buckets[month_key]["duration_s"] += duration
+        if act_date >= monday_this:
+            this_week["count"] += 1
+            this_week["duration_s"] += duration
+        elif act_date >= monday_last:
+            last_week["count"] += 1
+            last_week["duration_s"] += duration
+
+    # Sort months chronologically, take last 3, remove internal _num
+    sorted_months = sorted(month_buckets.values(), key=lambda m: m["_num"])
+    last_3 = sorted_months[-3:] if len(sorted_months) >= 3 else sorted_months
+    months_out = [{"month": m["month"], "count": m["count"], "duration_s": m["duration_s"]} for m in last_3]
+
+    return {
+        "this_week": this_week,
+        "last_week": last_week,
+        "year_total": year_total,
+        "months": months_out,
+    }
+
+
 @router.get("/gym-calendar")
 def gym_calendar(
     db: Session = Depends(get_db),

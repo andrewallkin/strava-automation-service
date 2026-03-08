@@ -182,6 +182,34 @@ export async function fetchGymCalendar(): Promise<GymCalendar> {
   return getJson<GymCalendar>("/ui/gym-calendar");
 }
 
+export type GymMonthEntry = {
+  month: string;
+  count: number;
+  duration_s: number;
+};
+
+export type GymSummary = {
+  this_week: { count: number; duration_s: number };
+  last_week: { count: number; duration_s: number };
+  year_total: number;
+  months: GymMonthEntry[];
+};
+
+export async function fetchGymSummary(): Promise<GymSummary> {
+  return getJson<GymSummary>("/ui/gym-summary");
+}
+
+export async function disconnectStrava(): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/strava/disconnect`, {
+    ...FETCH_OPTS,
+    method: "DELETE"
+  });
+  handle401(response, true);
+  if (!response.ok) {
+    throw new Error(`Disconnect failed: ${response.status}`);
+  }
+}
+
 export async function login(): Promise<boolean> {
   const response = await fetch(`${API_BASE}/auth/login`, {
     ...FETCH_OPTS,
