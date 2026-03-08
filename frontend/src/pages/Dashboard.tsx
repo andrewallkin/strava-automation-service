@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
 import {
   EventRow,
+  GymCalendar,
   PendingActivity,
+  ShoeVaultEntry,
   StravaActivity,
+  StreakData,
   Summary,
+  WeeklySummary,
   fetchActivities,
   fetchEvents,
+  fetchGymCalendar,
   fetchPending,
+  fetchShoeVault,
+  fetchStreak,
   fetchSummary,
+  fetchWeeklySummary,
   retryActivity
 } from "../lib/api";
 
@@ -303,6 +311,336 @@ export function RecentEvents({ events }: { events: EventRow[] }) {
         </div>
       )}
     </details>
+  );
+}
+
+function ErrorCard({ message }: { message: string }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-red-200 px-5 py-4">
+      <p className="text-sm text-red-600">{message}</p>
+    </div>
+  );
+}
+
+export function ShoeVault() {
+  const [shoes, setShoes] = useState<ShoeVaultEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchShoeVault()
+      .then(setShoes)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load shoes"));
+  }, []);
+
+  if (error) return <ErrorCard message={error} />;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="px-5 py-4 border-b border-gray-100">
+        <h2 className="text-base font-semibold text-gray-900">Shoe Vault</h2>
+        <p className="text-xs text-gray-500 mt-0.5">Lifetime distance per shoe</p>
+      </div>
+      {shoes === null ? (
+        <div className="px-5 py-4 space-y-4">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-3 bg-gray-200 rounded w-2/3 animate-pulse" />
+              <div className="h-2 bg-gray-200 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+      ) : shoes.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-gray-500">No shoes found.</p>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {shoes.map((shoe) => {
+            const km = Math.round(shoe.total_distance_m / 1000);
+            const pct = Math.min(km / 800, 1) * 100;
+            const nearRetirement = km >= 700;
+            return (
+              <div key={shoe.strava_gear_id} className="px-5 py-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-gray-900 truncate">{shoe.name}</span>
+                  {shoe.is_default && (
+                    <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                      default
+                    </span>
+                  )}
+                  {nearRetirement && (
+                    <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                      near retirement
+                    </span>
+                  )}
+                  <span className="ml-auto flex-shrink-0 text-xs text-gray-500">{km} km</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${nearRetirement ? "bg-red-500" : "bg-orange-400"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function WeeklyTrainingSummary() {
+  const [data, setData] = useState<WeeklySummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchWeeklySummary()
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load weekly summary"));
+  }, []);
+
+  if (error) return <ErrorCard message={error} />;
+
+  const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+
+  function Trend({ thisVal, lastVal }: { thisVal: number; lastVal: number }) {
+    if (thisVal > lastVal) return <span className="text-green-500 text-xs">↑</span>;
+    if (thisVal < lastVal) return <span className="text-red-500 text-xs">↓</span>;
+    return <span className="text-gray-400 text-xs">—</span>;
+  }
+
+  const maxKm = data ? Math.max(...data.this_week.days, 0.1) : 1;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="px-5 py-4 border-b border-gray-100">
+        <h2 className="text-base font-semibold text-gray-900">Weekly Training</h2>
+        <p className="text-xs text-gray-500 mt-0.5">This week vs last week</p>
+      </div>
+      {data === null ? (
+        <div className="px-5 py-4 space-y-3">
+          <div className="h-3 bg-gray-200 rounded w-full animate-pulse" />
+          <div className="h-10 bg-gray-100 rounded animate-pulse" />
+        </div>
+      ) : (
+        <div className="px-5 py-4 space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center">
+              <p className="text-xs text-gray-500">km</p>
+              <div className="flex items-center justify-center gap-1">
+                <p className="text-lg font-bold text-gray-900">{data.this_week.total_km.toFixed(1)}</p>
+                <Trend thisVal={data.this_week.total_km} lastVal={data.last_week.total_km} />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-500">runs</p>
+              <div className="flex items-center justify-center gap-1">
+                <p className="text-lg font-bold text-gray-900">{data.this_week.run_count}</p>
+                <Trend thisVal={data.this_week.run_count} lastVal={data.last_week.run_count} />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-500">elev</p>
+              <div className="flex items-center justify-center gap-1">
+                <p className="text-lg font-bold text-gray-900">{data.this_week.elevation_m}m</p>
+                <Trend thisVal={data.this_week.elevation_m} lastVal={data.last_week.elevation_m} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-end gap-1 h-10">
+              {data.this_week.days.map((km, i) => (
+                <div key={i} className="flex-1 flex flex-col justify-end">
+                  <div
+                    className="bg-orange-400 rounded-t"
+                    style={{ height: `${km > 0 ? Math.max((km / maxKm) * 40, 3) : 0}px` }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-1 mt-1">
+              {DAY_LABELS.map((l, i) => (
+                <div key={i} className="flex-1 text-center text-xs text-gray-400">{l}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function RunningStreak() {
+  const [data, setData] = useState<StreakData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchStreak()
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load streak"));
+  }, []);
+
+  if (error) return <ErrorCard message={error} />;
+
+  function formatPaceSec(secPerKm: number): string {
+    const min = Math.floor(secPerKm / 60);
+    const sec = Math.floor(secPerKm % 60);
+    return `${min}:${String(sec).padStart(2, "0")}/km`;
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="px-5 py-4 border-b border-gray-100">
+        <h2 className="text-base font-semibold text-gray-900">Running Streak &amp; PRs</h2>
+        <p className="text-xs text-gray-500 mt-0.5">Last 90 days</p>
+      </div>
+      {data === null ? (
+        <div className="px-5 py-4 space-y-3">
+          <div className="h-12 bg-gray-100 rounded animate-pulse" />
+          <div className="h-12 bg-gray-100 rounded animate-pulse" />
+        </div>
+      ) : (
+        <div className="px-5 py-4 space-y-4">
+          <div className="flex gap-3">
+            <div className="flex-1 bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-orange-600">{data.current_streak}</p>
+              <p className="text-xs text-orange-500 mt-0.5">current streak (days)</p>
+            </div>
+            <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-gray-700">{data.best_streak}</p>
+              <p className="text-xs text-gray-500 mt-0.5">best streak (days)</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {data.prs.fastest_pace && (
+              <div className="bg-gray-50 rounded-lg px-3 py-3">
+                <p className="text-xs text-gray-500 mb-1">Fastest pace</p>
+                <p className="text-sm font-bold text-gray-900">
+                  {data.prs.fastest_pace.value_sec_per_km != null
+                    ? formatPaceSec(data.prs.fastest_pace.value_sec_per_km)
+                    : "—"}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">
+                  {data.prs.fastest_pace.activity_name ?? "Run"}
+                </p>
+              </div>
+            )}
+            {data.prs.longest_run && (
+              <div className="bg-gray-50 rounded-lg px-3 py-3">
+                <p className="text-xs text-gray-500 mb-1">Longest run</p>
+                <p className="text-sm font-bold text-gray-900">
+                  {(data.prs.longest_run.distance_m / 1000).toFixed(2)} km
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">
+                  {data.prs.longest_run.activity_name ?? "Run"}
+                </p>
+              </div>
+            )}
+            {data.prs.most_elevation && (
+              <div className="bg-gray-50 rounded-lg px-3 py-3">
+                <p className="text-xs text-gray-500 mb-1">Most elevation</p>
+                <p className="text-sm font-bold text-gray-900">
+                  {data.prs.most_elevation.elevation_m != null
+                    ? `${Math.round(data.prs.most_elevation.elevation_m)}m`
+                    : "—"}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">
+                  {data.prs.most_elevation.activity_name ?? "Run"}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function GymConsistencyCalendar() {
+  const [data, setData] = useState<GymCalendar | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchGymCalendar()
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load gym calendar"));
+  }, []);
+
+  if (error) return <ErrorCard message={error} />;
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+
+  function buildCalendar(year: number, month: number, gymDays: Set<string>) {
+    const firstDay = new Date(year, month - 1, 1);
+    // Shift so Mon=0
+    const offset = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    return { offset, daysInMonth };
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="px-5 py-4 border-b border-gray-100">
+        <h2 className="text-base font-semibold text-gray-900">Gym Consistency</h2>
+        <p className="text-xs text-gray-500 mt-0.5">Last 60 days</p>
+      </div>
+      {data === null ? (
+        <div className="px-5 py-4">
+          <div className="h-32 bg-gray-100 rounded animate-pulse" />
+        </div>
+      ) : (
+        <div className="px-5 py-4 space-y-4">
+          <div className="flex gap-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-orange-500">{data.month_session_count}</p>
+              <p className="text-xs text-gray-500">sessions this month</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-700">{data.weeks_with_gym_streak}</p>
+              <p className="text-xs text-gray-500">week streak</p>
+            </div>
+          </div>
+          {(() => {
+            const gymSet = new Set(data.gym_days);
+            const { offset, daysInMonth } = buildCalendar(data.year, data.month, gymSet);
+            const cells: (number | null)[] = [
+              ...Array(offset).fill(null),
+              ...Array.from({ length: daysInMonth }, (_, i) => i + 1)
+            ];
+            return (
+              <div>
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {DAY_LABELS.map((l, i) => (
+                    <div key={i} className="text-center text-xs text-gray-400">{l}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {cells.map((day, i) => {
+                    if (day === null) return <div key={i} />;
+                    const dateStr = `${data.year}-${String(data.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                    const isGym = gymSet.has(dateStr);
+                    const isToday = dateStr === todayStr;
+                    return (
+                      <div key={i} className="flex items-center justify-center aspect-square">
+                        <div
+                          className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium
+                            ${isGym ? "bg-orange-400 text-white" : "text-gray-600"}
+                            ${isToday && !isGym ? "ring-2 ring-orange-400" : ""}
+                          `}
+                        >
+                          {day}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
   );
 }
 

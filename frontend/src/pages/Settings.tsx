@@ -11,7 +11,16 @@ import {
   retryActivity,
   updateSettings
 } from "../lib/api";
-import { ActivityFeed, PendingActivities, RecentEvents, StatsGrid } from "./Dashboard";
+import {
+  ActivityFeed,
+  GymConsistencyCalendar,
+  PendingActivities,
+  RecentEvents,
+  RunningStreak,
+  ShoeVault,
+  StatsGrid,
+  WeeklyTrainingSummary
+} from "./Dashboard";
 
 function Toggle({
   checked,
@@ -201,6 +210,12 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
             {/* Stats grid */}
             <StatsGrid summary={summary} />
 
+            {/* Shoe vault */}
+            <ShoeVault />
+
+            {/* Weekly training summary */}
+            <WeeklyTrainingSummary />
+
             {/* Pending activities */}
             <PendingActivities pending={pending} onRetry={retryActivity} />
           </div>
@@ -208,6 +223,8 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
           {/* Right main area */}
           <div className="flex-1 min-w-0 space-y-4">
             <ActivityFeed />
+            <RunningStreak />
+            <GymConsistencyCalendar />
             <RecentEvents events={events} />
           </div>
         </div>

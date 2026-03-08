@@ -118,6 +118,70 @@ export async function fetchActivities(page = 1): Promise<StravaActivity[]> {
   return getJson<StravaActivity[]>(`/ui/activities?${params}`);
 }
 
+export type ShoeVaultEntry = {
+  strava_gear_id: string;
+  name: string;
+  is_default: boolean;
+  total_distance_m: number;
+  brand_name: string | null;
+  model_name: string | null;
+};
+
+export type WeekStats = {
+  total_km: number;
+  run_count: number;
+  elevation_m: number;
+  days: number[];
+};
+
+export type WeeklySummary = {
+  this_week: WeekStats;
+  last_week: WeekStats;
+};
+
+export type PrEntry = {
+  activity_name: string | null;
+  activity_date: string;
+  distance_m: number;
+  moving_time_s: number;
+  value_sec_per_km?: number;
+  elevation_m?: number;
+} | null;
+
+export type StreakData = {
+  current_streak: number;
+  best_streak: number;
+  prs: {
+    fastest_pace: PrEntry;
+    longest_run: PrEntry;
+    most_elevation: PrEntry;
+  };
+};
+
+export type GymCalendar = {
+  gym_days: string[];
+  month_session_count: number;
+  weeks_with_gym_streak: number;
+  year: number;
+  month: number;
+};
+
+export async function fetchShoeVault(): Promise<ShoeVaultEntry[]> {
+  return getJson<ShoeVaultEntry[]>("/ui/shoe-vault");
+}
+
+export async function fetchWeeklySummary(): Promise<WeeklySummary> {
+  return getJson<WeeklySummary>("/ui/weekly-summary");
+}
+
+export async function fetchStreak(): Promise<StreakData> {
+  return getJson<StreakData>("/ui/streak");
+}
+
+export async function fetchGymCalendar(): Promise<GymCalendar> {
+  return getJson<GymCalendar>("/ui/gym-calendar");
+}
+
 export async function login(): Promise<boolean> {
   const response = await fetch(`${API_BASE}/auth/login`, {
     ...FETCH_OPTS,
