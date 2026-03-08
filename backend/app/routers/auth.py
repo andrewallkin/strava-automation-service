@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -15,6 +16,8 @@ from app.services.strava_service import StravaService
 router = APIRouter(prefix="/api/auth/strava", tags=["auth"])
 logout_router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+log = logging.getLogger("auth")
+
 
 @logout_router.post("/login")
 def login(response: Response, db: Session = Depends(get_db)) -> dict:
@@ -27,6 +30,7 @@ def login(response: Response, db: Session = Depends(get_db)) -> dict:
 
     jwt_service = JwtService()
     jwt_service.set_auth_cookie(response, jwt_service.issue_token(user))
+    log.info("Login successful | athlete=%s", user.athlete_name or user.strava_athlete_id)
     return {"ok": True}
 
 
@@ -42,13 +46,15 @@ def callback(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     settings = get_settings()
-    base_url = (settings.frontend_base_url or settings.public_base_url).rstrip("/") or "http://localhost"
+    base_url = (settings.frontend_base_url or settings.public_base_url).rstrip("/") or ""
     try:
         service = StravaService()
         user = service.exchange_code_for_token(db, code)
+        log.info("Strava OAuth connected | athlete=%s id=%s", user.athlete_name, user.strava_athlete_id)
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover - passthrough error handling
+        log.error("Strava OAuth exchange failed: %s", exc)
         params = urlencode({"strava": "error", "message": str(exc)[:200]})
         return RedirectResponse(url=f"{base_url}/?{params}")
 
@@ -62,6 +68,7 @@ def callback(
 def logout(response: Response) -> dict:
     jwt_service = JwtService()
     jwt_service.clear_auth_cookie(response)
+    log.info("User logged out")
     return {"logged_out": True}
 
 
@@ -71,10 +78,12 @@ def disconnect_strava(
     db: Session = Depends(get_db),
     user: User = Depends(require_jwt_user),
 ) -> dict:
+    athlete_name = user.athlete_name or user.strava_athlete_id
     user.strava_athlete_id = None
     user.access_token = None
     user.refresh_token = None
     user.expires_at = None
+    log.info("Strava disconnected | athlete=%s", athlete_name)
     db.commit()
     jwt_service = JwtService()
     jwt_service.clear_auth_cookie(response)

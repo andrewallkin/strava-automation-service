@@ -140,6 +140,35 @@ class StravaService:
         resp.raise_for_status()
         return resp.json()  # type: ignore[no-any-return]
 
+    def get_gear_detail(self, db: Session, user: User, gear_id: str) -> dict:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/gear/{gear_id}",
+            headers=self._headers(user.access_token or ""),
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_activities_since(
+        self, db: Session, user: User, after_epoch: int, max_pages: int = 10
+    ) -> list[dict]:
+        user = self.ensure_fresh_token(db, user)
+        results: list[dict] = []
+        for page in range(1, max_pages + 1):
+            resp = httpx.get(
+                f"{STRAVA_BASE_URL}/api/v3/athlete/activities",
+                headers=self._headers(user.access_token or ""),
+                params={"after": after_epoch, "per_page": 200, "page": page},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            batch: list[dict] = resp.json()
+            results.extend(batch)
+            if len(batch) < 200:
+                break
+        return results
+
     def sync_gear_cache(self, db: Session, user: User) -> list[dict]:
         user = self.ensure_fresh_token(db, user)
         resp = httpx.get(

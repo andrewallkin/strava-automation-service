@@ -100,17 +100,7 @@ server {
 
 ## Post-Deployment: Webhook Registration
 
-After the first successful deploy, register the Strava and Telegram webhooks:
-
-```bash
-# On VPS or locally with VPS-accessible PUBLIC_BASE_URL
-cd /srv/apps/strava-automation-service
-PUBLIC_BASE_URL=https://strava.yourdomain.com bash ops/scripts/register-webhooks.sh
-```
-
-This registers:
-- **Strava webhook**: Strava pushes activity events to `/api/strava/webhook`
-- **Telegram webhook**: Telegram delivers bot messages to `/api/telegram/webhook/{secret}`
+Webhooks are registered automatically by the deploy workflow on each deploy. No manual step required.
 
 ## Verification Checklist
 
@@ -121,16 +111,6 @@ This registers:
 
 ## Compose File Reference
 
-| File                    | Purpose                                      |
-|-------------------------|----------------------------------------------|
-| `docker-compose.yml`    | Production (used by CI/CD)                   |
-| `docker-compose.dev.yml`| Local development (hot reload, ngrok, tunnel)|
-
-## Development
-
-```bash
-make dev-up       # Start local dev environment
-make dev-logs     # Tail all logs
-make dev-shell    # Shell into api container
-make migrate      # Apply pending migrations
-```
+| File                 | Purpose              |
+|----------------------|----------------------|
+| `docker-compose.yml` | Production (used by CI/CD) |

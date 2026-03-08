@@ -1,4 +1,5 @@
 import json
+from datetime import date, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import require_jwt_user
 from app.models import EventLog, PendingActivity, User
+from app.services.activity_service import list_gear
 from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
 
@@ -128,6 +130,8 @@ def retry_activity(
 
 
 FEED_TYPES = {"Run", "VirtualRun", "TrailRun", "TreadmillRun", "TrackRun", "WeightTraining", "Workout"}
+RUN_SPORT_TYPES = {"Run", "VirtualRun", "TrailRun", "TreadmillRun", "TrackRun"}
+GYM_SPORT_TYPES = {"WeightTraining", "Workout"}
 
 
 @router.get("/activities")
@@ -157,3 +161,286 @@ def activities(
         for a in raw
         if (a.get("type") or a.get("sport_type")) in FEED_TYPES
     ]
+
+
+@router.get("/shoe-vault")
+def shoe_vault(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> list[dict]:
+    if not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    strava = StravaService()
+    gears = list_gear(db)
+    if not gears:
+        strava.sync_gear_cache(db, user)
+        gears = list_gear(db)
+    result = []
+    for gear in gears:
+        detail = strava.get_gear_detail(db, user, gear.strava_gear_id)
+        result.append(
+            {
+                "strava_gear_id": gear.strava_gear_id,
+                "name": gear.name,
+                "is_default": gear.is_default,
+                "total_distance_m": detail.get("distance", 0),
+                "brand_name": detail.get("brand_name"),
+                "model_name": detail.get("model_name"),
+            }
+        )
+    return result
+
+
+@router.get("/weekly-summary")
+def weekly_summary(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    today = date.today()
+    monday_this = today - timedelta(days=today.weekday())
+    monday_last = monday_this - timedelta(weeks=1)
+    after_epoch = int((monday_last - date(1970, 1, 1)).total_seconds())
+    strava = StravaService()
+    activities = strava.get_activities_since(db, user, after_epoch, max_pages=2)
+    runs = [a for a in activities if (a.get("sport_type") or a.get("type")) in RUN_SPORT_TYPES]
+
+    def empty_day() -> dict:
+        return {"km": 0.0, "moving_time_s": 0, "elevation_m": 0.0, "count": 0, "activities": []}
+
+    def empty_week() -> dict:
+        return {"total_km": 0.0, "run_count": 0, "elevation_m": 0.0, "days": [empty_day() for _ in range(7)]}
+
+    this_week = empty_week()
+    last_week = empty_week()
+
+    for a in runs:
+        raw_date = (a.get("start_date_local") or a.get("start_date") or "")[:10]
+        if not raw_date:
+            continue
+        try:
+            act_date = date.fromisoformat(raw_date)
+        except ValueError:
+            continue
+        km = (a.get("distance") or 0) / 1000
+        elev = a.get("total_elevation_gain") or 0
+        moving_time = a.get("moving_time") or 0
+        if act_date >= monday_this:
+            bucket = this_week
+        elif act_date >= monday_last:
+            bucket = last_week
+        else:
+            continue
+        bucket["total_km"] += km
+        bucket["run_count"] += 1
+        bucket["elevation_m"] += elev
+        day = bucket["days"][act_date.weekday()]
+        day["km"] += km
+        day["moving_time_s"] += moving_time
+        day["elevation_m"] += elev
+        day["count"] += 1
+        day["activities"].append({
+            "name": a.get("name") or "Run",
+            "km": round(km, 2),
+            "moving_time_s": moving_time,
+            "elevation_m": round(elev),
+        })
+
+    this_week["total_km"] = round(this_week["total_km"], 2)
+    last_week["total_km"] = round(last_week["total_km"], 2)
+    this_week["elevation_m"] = round(this_week["elevation_m"])
+    last_week["elevation_m"] = round(last_week["elevation_m"])
+    for week in [this_week, last_week]:
+        for day in week["days"]:
+            day["km"] = round(day["km"], 2)
+            day["elevation_m"] = round(day["elevation_m"])
+
+    return {"this_week": this_week, "last_week": last_week}
+
+
+@router.get("/streak")
+def streak(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    today = date.today()
+    after_epoch = int((today - timedelta(days=90) - date(1970, 1, 1)).total_seconds())
+    strava = StravaService()
+    activities = strava.get_activities_since(db, user, after_epoch, max_pages=5)
+    runs = [
+        a for a in activities
+        if (a.get("sport_type") or a.get("type")) in RUN_SPORT_TYPES
+        and (a.get("distance") or 0) >= 1000
+    ]
+
+    run_days: set[date] = set()
+    for a in runs:
+        raw = (a.get("start_date_local") or a.get("start_date") or "")[:10]
+        try:
+            run_days.add(date.fromisoformat(raw))
+        except ValueError:
+            pass
+
+    def streak_from(start: date) -> int:
+        count = 0
+        d = start
+        while d in run_days:
+            count += 1
+            d -= timedelta(days=1)
+        return count
+
+    # Current streak: start from today or yesterday
+    if today in run_days:
+        current_streak = streak_from(today)
+    else:
+        current_streak = streak_from(today - timedelta(days=1))
+
+    best_streak = max((streak_from(d) for d in run_days), default=0)
+
+    # PRs
+    fastest_pace_entry = None
+    longest_run_entry = None
+    most_elevation_entry = None
+
+    for a in runs:
+        dist = a.get("distance") or 0
+        moving_time = a.get("moving_time") or 0
+        elev = a.get("total_elevation_gain") or 0
+        raw_date = (a.get("start_date_local") or a.get("start_date") or "")[:10]
+        entry = {
+            "activity_name": a.get("name"),
+            "activity_date": raw_date,
+            "distance_m": dist,
+            "moving_time_s": moving_time,
+        }
+        if dist >= 1000 and moving_time > 0:
+            pace_sec_per_km = moving_time / (dist / 1000)
+            if fastest_pace_entry is None or pace_sec_per_km < fastest_pace_entry["value_sec_per_km"]:
+                fastest_pace_entry = {**entry, "value_sec_per_km": pace_sec_per_km}
+        if longest_run_entry is None or dist > longest_run_entry["distance_m"]:
+            longest_run_entry = entry
+        if elev > 0 and (most_elevation_entry is None or elev > most_elevation_entry["elevation_m"]):
+            most_elevation_entry = {**entry, "elevation_m": elev}
+
+    return {
+        "current_streak": current_streak,
+        "best_streak": best_streak,
+        "prs": {
+            "fastest_pace": fastest_pace_entry,
+            "longest_run": longest_run_entry,
+            "most_elevation": most_elevation_entry,
+        },
+    }
+
+
+@router.get("/gym-summary")
+def gym_summary(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    today = date.today()
+    jan1 = today.replace(month=1, day=1)
+    after_epoch = int((jan1 - date(1970, 1, 1)).total_seconds())
+    strava = StravaService()
+    activities = strava.get_activities_since(db, user, after_epoch, max_pages=10)
+    gym_acts = [
+        a for a in activities
+        if (a.get("sport_type") or a.get("type")) in GYM_SPORT_TYPES
+    ]
+
+    monday_this = today - timedelta(days=today.weekday())
+    monday_last = monday_this - timedelta(weeks=1)
+
+    this_week = {"count": 0, "duration_s": 0}
+    last_week = {"count": 0, "duration_s": 0}
+    year_total = 0
+    month_buckets: dict[str, dict] = {}
+
+    for a in gym_acts:
+        raw_date = (a.get("start_date_local") or a.get("start_date") or "")[:10]
+        if not raw_date:
+            continue
+        try:
+            act_date = date.fromisoformat(raw_date)
+        except ValueError:
+            continue
+        duration = a.get("moving_time") or a.get("elapsed_time") or 0
+        year_total += 1
+        month_key = act_date.strftime("%b")
+        month_num = act_date.month
+        if month_key not in month_buckets:
+            month_buckets[month_key] = {"month": month_key, "count": 0, "duration_s": 0, "_num": month_num}
+        month_buckets[month_key]["count"] += 1
+        month_buckets[month_key]["duration_s"] += duration
+        if act_date >= monday_this:
+            this_week["count"] += 1
+            this_week["duration_s"] += duration
+        elif act_date >= monday_last:
+            last_week["count"] += 1
+            last_week["duration_s"] += duration
+
+    # Sort months chronologically, take last 3, remove internal _num
+    sorted_months = sorted(month_buckets.values(), key=lambda m: m["_num"])
+    last_3 = sorted_months[-3:] if len(sorted_months) >= 3 else sorted_months
+    months_out = [{"month": m["month"], "count": m["count"], "duration_s": m["duration_s"]} for m in last_3]
+
+    return {
+        "this_week": this_week,
+        "last_week": last_week,
+        "year_total": year_total,
+        "months": months_out,
+    }
+
+
+@router.get("/gym-calendar")
+def gym_calendar(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    today = date.today()
+    after_epoch = int((today - timedelta(days=60) - date(1970, 1, 1)).total_seconds())
+    strava = StravaService()
+    activities = strava.get_activities_since(db, user, after_epoch, max_pages=3)
+    gym_acts = [
+        a for a in activities
+        if (a.get("sport_type") or a.get("type")) in GYM_SPORT_TYPES
+    ]
+
+    gym_days: set[date] = set()
+    for a in gym_acts:
+        raw = (a.get("start_date_local") or a.get("start_date") or "")[:10]
+        try:
+            gym_days.add(date.fromisoformat(raw))
+        except ValueError:
+            pass
+
+    month_start = today.replace(day=1)
+    month_session_count = sum(1 for d in gym_days if d.year == today.year and d.month == today.month)
+
+    # Consecutive weeks (Mon–Sun) ending this week with ≥ 1 gym session
+    monday_this = today - timedelta(days=today.weekday())
+    weeks_with_gym_streak = 0
+    monday = monday_this
+    while True:
+        sunday = monday + timedelta(days=6)
+        week_days = {monday + timedelta(days=i) for i in range(7)}
+        if gym_days & week_days:
+            weeks_with_gym_streak += 1
+            monday -= timedelta(weeks=1)
+        else:
+            break
+
+    return {
+        "gym_days": sorted(d.isoformat() for d in gym_days),
+        "month_session_count": month_session_count,
+        "weeks_with_gym_streak": weeks_with_gym_streak,
+        "year": today.year,
+        "month": today.month,
+    }

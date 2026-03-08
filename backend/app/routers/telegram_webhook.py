@@ -1,13 +1,18 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
+from app.logging_utils import fmt_dist
 from app.models import Gear, PendingActivity, User
 from app.services.activity_service import clear_pending_activity, log_event
 from app.services.strava_service import StravaService
 from app.services.telegram_service import TelegramService
+
+log = logging.getLogger("telegram")
 
 router = APIRouter(prefix="/api/telegram", tags=["telegram-webhook"])
 
@@ -44,6 +49,8 @@ async def telegram_webhook(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    log.info("Gear selection received | activity=%s gear_id=%s", activity_id, gear_id)
+
     pending = db.scalar(select(PendingActivity).where(PendingActivity.activity_id == activity_id))
     if not pending:
         return {"status": "ignored", "reason": "no pending activity"}
@@ -69,6 +76,10 @@ async def telegram_webhook(
             activity_data = strava.get_activity(db, activity_id=activity_id, user=user)
             activity_name = activity_data.get("name", "")
             distance_m = activity_data.get("distance", 0) or 0
+            log.info(
+                'Gear selected: %s → "%s" (%s) | activity=%s',
+                shoe_name, activity_name, fmt_dist(distance_m), activity_id,
+            )
             km_str = f"{distance_m / 1000:.2f}km" if distance_m else ""
             if km_str:
                 confirmation = f"✅ {shoe_name} logged for your {km_str} run"
@@ -78,6 +89,7 @@ async def telegram_webhook(
             else:
                 confirmation = f"✅ {shoe_name} logged. Smashed it 💪"
         except Exception:
+            log.warning("Could not fetch activity details for log | activity=%s", activity_id)
             confirmation = f"✅ {shoe_name} logged. Smashed it 💪"
         telegram.send_message(chat_id, confirmation)
 
