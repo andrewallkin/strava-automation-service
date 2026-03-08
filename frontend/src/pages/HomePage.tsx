@@ -115,18 +115,16 @@ export function HomePage() {
   }, [loadSummary]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-      <div className="space-y-4 flex flex-col">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-4">
         <StatsGrid summary={summary} />
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1">
-            <WeeklyTrainingSummary />
-          </div>
+        <div className="flex-1 flex flex-col min-h-0">
+          <WeeklyTrainingSummary className="h-full" />
         </div>
       </div>
-      <div className="space-y-4 flex flex-col">
-        <div className="flex-1">
-          <ShoeVault />
+      <div className="flex flex-col gap-4">
+        <div className="flex-1 flex flex-col min-h-0">
+          <ShoeVault className="h-full" />
         </div>
         <GymSummary />
       </div>

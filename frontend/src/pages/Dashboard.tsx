@@ -322,7 +322,7 @@ function ErrorCard({ message }: { message: string }) {
   );
 }
 
-export function ShoeVault() {
+export function ShoeVault({ className }: { className?: string }) {
   const [shoes, setShoes] = useState<ShoeVaultEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -335,7 +335,7 @@ export function ShoeVault() {
   if (error) return <ErrorCard message={error} />;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-200${className ? ` ${className}` : ""}`}>
       <div className="px-5 py-4 border-b border-gray-100">
         <h2 className="text-base font-semibold text-gray-900">Shoe Vault</h2>
         <p className="text-xs text-gray-500 mt-0.5">Lifetime distance per shoe</p>
@@ -401,7 +401,7 @@ function formatRunPace(km: number, seconds: number): string {
   return `${paceMin}:${String(paceSec).padStart(2, "0")}/km`;
 }
 
-export function WeeklyTrainingSummary() {
+export function WeeklyTrainingSummary({ className }: { className?: string }) {
   const [data, setData] = useState<WeeklySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -414,6 +414,7 @@ export function WeeklyTrainingSummary() {
   if (error) return <ErrorCard message={error} />;
 
   const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+  const FULL_DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
   function Trend({ thisVal, lastVal }: { thisVal: number; lastVal: number }) {
     if (thisVal > lastVal) return <span className="text-green-500 text-xs">↑</span>;
@@ -424,9 +425,9 @@ export function WeeklyTrainingSummary() {
   const maxKm = data ? Math.max(...data.this_week.days.map((d) => d.km), 0.1) : 1;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-200${className ? ` ${className}` : ""}`}>
       <div className="px-5 py-4 border-b border-gray-100">
-        <h2 className="text-base font-semibold text-gray-900">Weekly Training</h2>
+        <h2 className="text-base font-semibold text-gray-900">Weekly Running</h2>
         <p className="text-xs text-gray-500 mt-0.5">This week vs last week</p>
       </div>
       {data === null ? (
@@ -488,7 +489,7 @@ export function WeeklyTrainingSummary() {
               {data.this_week.days.map((day, i) =>
                 day.activities.map((act, j) => (
                   <div key={`${i}-${j}`} className="flex items-center gap-2 text-xs">
-                    <span className="w-4 text-gray-400 font-medium">{DAY_LABELS[i]}</span>
+                    <span className="w-20 text-gray-400 font-medium flex-shrink-0">{FULL_DAY_NAMES[i]}</span>
                     <span className="text-gray-900 font-medium truncate flex-1">{act.name}</span>
                     <span className="text-gray-600">{act.km.toFixed(1)} km</span>
                     <span className="text-gray-500">{formatRunDuration(act.moving_time_s)}</span>
