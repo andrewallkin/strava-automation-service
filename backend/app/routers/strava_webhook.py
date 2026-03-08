@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
@@ -5,6 +7,8 @@ from app.config import get_settings
 from app.db import get_db
 from app.services.activity_service import log_event
 from app.services.webhook_processor import process_activity
+
+log = logging.getLogger("webhook")
 
 router = APIRouter(prefix="/api/strava", tags=["strava-webhook"])
 
@@ -28,6 +32,11 @@ async def receive_webhook(
     db: Session = Depends(get_db),
 ) -> dict:
     payload = await request.json()
+    log.info(
+        "Strava event | object_type=%s aspect_type=%s activity=%s athlete=%s",
+        payload.get("object_type"), payload.get("aspect_type"),
+        payload.get("object_id"), payload.get("owner_id"),
+    )
     log_event(db, "strava_webhook_received", "ok", "Strava webhook received", payload)
 
     if payload.get("object_type") != "activity":
@@ -46,6 +55,7 @@ async def receive_webhook(
     ):
         return {"status": "ignored", "reason": "unauthorized_owner"}
 
+    log.info("Activity create queued | activity=%s athlete=%s", activity_id, owner_id)
     background_tasks.add_task(
         process_activity,
         int(activity_id),
