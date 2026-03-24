@@ -4,12 +4,11 @@ services:
       context: ./backend
     ports:
       - "${BACKEND_PORT:-8002}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    depends_on: []
     env_file:
       - .env
     restart: always
+    networks: [default, postgres-net]
 
   frontend:
     build:
@@ -19,19 +18,9 @@ services:
     depends_on:
       - api
     restart: always
+    networks: [default]
 
-  postgres:
-    image: postgres:16-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: always
-
-volumes:
-  postgres_data:
+networks:
+  default:
+  postgres-net:
+    external: true

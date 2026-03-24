@@ -31,6 +31,7 @@ def _configure_logging() -> None:
             "processor":      {"handlers": ["console"], "level": log_level, "propagate": False},
             "telegram":       {"handlers": ["console"], "level": log_level, "propagate": False},
             "auth":           {"handlers": ["console"], "level": log_level, "propagate": False},
+            "db":             {"handlers": ["console"], "level": log_level, "propagate": False},
         },
         "root": {"handlers": ["console"], "level": "WARNING"},
     })
