@@ -18,6 +18,7 @@ import {
   fetchWeeklySummary,
   retryActivity
 } from "../lib/api";
+import { formatMovingTime } from "../lib/formatMovingTime";
 
 const DATE_OPTS: Intl.DateTimeFormatOptions = {
   day: "numeric",
@@ -71,21 +72,10 @@ function formatPace(distanceM: number, movingTimeS: number): string {
   return `${paceMin}:${String(paceSec).padStart(2, "0")}/km`;
 }
 
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (mins >= 60) {
-    const hrs = Math.floor(mins / 60);
-    const rem = mins % 60;
-    return `${hrs}h ${String(rem).padStart(2, "0")}m`;
-  }
-  return `${mins}:${String(secs).padStart(2, "0")}`;
-}
-
 function ActivityCard({ activity }: { activity: StravaActivity }) {
   const isRun = RUN_TYPES.has(activity.type ?? "");
   const distanceKm = activity.distance ? (activity.distance / 1000).toFixed(2) : null;
-  const duration = activity.moving_time ? formatDuration(activity.moving_time) : null;
+  const duration = activity.moving_time != null ? formatMovingTime(activity.moving_time) : null;
   const pace = (activity.distance && activity.moving_time)
     ? formatPace(activity.distance, activity.moving_time)
     : null;
@@ -383,16 +373,6 @@ export function ShoeVault({ className }: { className?: string }) {
   );
 }
 
-function formatRunDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  if (mins >= 60) {
-    const hrs = Math.floor(mins / 60);
-    const rem = mins % 60;
-    return `${hrs}h ${String(rem).padStart(2, "0")}m`;
-  }
-  return `${mins}m`;
-}
-
 function formatRunPace(km: number, seconds: number): string {
   if (!km || !seconds) return "";
   const paceSecPerKm = seconds / km;
@@ -505,7 +485,7 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
                       <span className="text-gray-400 font-medium">{FULL_DAY_NAMES[i]}</span>
                       <span className="text-gray-900 font-medium truncate">{act.name}</span>
                       <span className="text-right text-orange-600 font-semibold">{act.km.toFixed(1)}</span>
-                      <span className="text-right text-gray-600">{formatRunDuration(act.moving_time_s)}</span>
+                      <span className="text-right text-gray-600">{formatMovingTime(act.moving_time_s)}</span>
                       <span className="text-right text-blue-600 font-medium">{formatRunPace(act.km, act.moving_time_s)}</span>
                       <span className="text-right text-gray-500">{act.elevation_m > 0 ? `${act.elevation_m}m` : "—"}</span>
                     </div>

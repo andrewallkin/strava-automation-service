@@ -1,6 +1,7 @@
 import httpx
 
 from app.config import get_settings
+from app.time_formatting import format_moving_time_s
 
 TELEGRAM_BASE_URL = "https://api.telegram.org"
 
@@ -33,9 +34,8 @@ class TelegramService:
                     pace_sec_per_km = moving_time_s / km
                     pace_min = int(pace_sec_per_km // 60)
                     pace_sec = int(pace_sec_per_km % 60)
-                    mins = moving_time_s // 60
-                    secs = moving_time_s % 60
-                    lines.append(f"🏃 {km:.2f}km in {mins}:{secs:02d} ({pace_min}:{pace_sec:02d}/km)")
+                    duration = format_moving_time_s(moving_time_s)
+                    lines.append(f"🏃 {km:.2f}km in {duration} ({pace_min}:{pace_sec:02d}/km)")
                 else:
                     lines.append(f"🏃 {km:.2f}km")
             if elevation_m > 0:

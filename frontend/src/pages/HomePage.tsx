@@ -7,6 +7,7 @@ import {
 } from "../lib/api";
 import { ShoeVault, StatsGrid, WeeklyTrainingSummary } from "./Dashboard";
 
+/** Gym weekly/monthly aggregates — hours + minutes only (no seconds) to avoid noisy totals. */
 function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
