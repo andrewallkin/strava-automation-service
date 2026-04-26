@@ -72,7 +72,7 @@ class StravaActivity(Base):
         Index("idx_strava_activities_athlete_start", "athlete_id", "start_date_local"),
         Index("idx_strava_activities_type_start", "sport_type", "start_date_local"),
         Index("idx_strava_activities_detail_gin", "detail_data", postgresql_using="gin"),
-        Index("idx_strava_activities_metadata_gin", "ingestion_metadata", postgresql_using="gin"),
+        Index("idx_strava_activities_metadata_gin", "metadata", postgresql_using="gin"),
         Index(
             "idx_strava_activities_not_deleted",
             "start_date_local",
