@@ -5,7 +5,21 @@ from sqlalchemy import create_engine, pool
 
 from app.config import get_settings
 from app.db import Base
-from app.models import EventLog, Gear, PendingActivity, User  # noqa: F401
+from app.models import (  # noqa: F401
+    EventLog,
+    Gear,
+    PendingActivity,
+    StravaActivity,
+    StravaActivityBestEffort,
+    StravaActivityLap,
+    StravaActivitySegmentEffort,
+    StravaActivitySplit,
+    StravaActivityStream,
+    StravaActivityZone,
+    StravaBackfillRun,
+    StravaIngestionJob,
+    User,
+)
 
 config = context.config
 

@@ -116,6 +116,66 @@ class StravaService:
         resp.raise_for_status()
         return resp.json()
 
+    def get_activity_detail(
+        self,
+        db: Session,
+        activity_id: int,
+        user: User,
+        include_all_efforts: bool = True,
+    ) -> dict:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/activities/{activity_id}",
+            headers=self._headers(user.access_token or ""),
+            params={"include_all_efforts": str(include_all_efforts).lower()},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_activity_laps(self, db: Session, activity_id: int, user: User) -> list[dict]:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/activities/{activity_id}/laps",
+            headers=self._headers(user.access_token or ""),
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
+
+    def get_activity_zones(self, db: Session, activity_id: int, user: User) -> list[dict] | None:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/activities/{activity_id}/zones",
+            headers=self._headers(user.access_token or ""),
+            timeout=30,
+        )
+        if resp.status_code in {401, 403, 404}:
+            return None
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
+
+    def get_activity_streams(
+        self,
+        db: Session,
+        activity_id: int,
+        user: User,
+        keys: list[str],
+        key_by_type: bool = True,
+    ) -> dict:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/activities/{activity_id}/streams",
+            headers=self._headers(user.access_token or ""),
+            params={
+                "keys": ",".join(keys),
+                "key_by_type": str(key_by_type).lower(),
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def update_activity(self, db: Session, activity_id: int, payload: dict, user: User) -> dict:
         user = self.ensure_fresh_token(db, user)
         resp = httpx.put(
@@ -167,6 +227,37 @@ class StravaService:
             results.extend(batch)
             if len(batch) < 200:
                 break
+        return results
+
+    def get_athlete_activities_between(
+        self,
+        db: Session,
+        user: User,
+        after_epoch: int,
+        before_epoch: int,
+        max_pages: int | None = None,
+    ) -> list[dict]:
+        user = self.ensure_fresh_token(db, user)
+        results: list[dict] = []
+        page = 1
+        while max_pages is None or page <= max_pages:
+            resp = httpx.get(
+                f"{STRAVA_BASE_URL}/api/v3/athlete/activities",
+                headers=self._headers(user.access_token or ""),
+                params={
+                    "after": after_epoch,
+                    "before": before_epoch,
+                    "per_page": 200,
+                    "page": page,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            batch: list[dict] = resp.json()
+            results.extend(batch)
+            if len(batch) < 200:
+                break
+            page += 1
         return results
 
     def sync_gear_cache(self, db: Session, user: User) -> list[dict]:

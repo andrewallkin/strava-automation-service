@@ -9,6 +9,7 @@ type LayoutProps = {
 const tabs = [
   { to: "/", label: "Home" },
   { to: "/activities", label: "Activities" },
+  { to: "/ingestion", label: "Ingestion" },
   { to: "/events", label: "Events" },
   { to: "/settings", label: "Settings" },
 ];

@@ -46,6 +46,76 @@ export type StravaActivity = {
   start_date_local: string | null;
 };
 
+export type IngestedActivity = {
+  activity_id: number;
+  name: string | null;
+  description: string | null;
+  activity_type: string | null;
+  sport_type: string | null;
+  start_date: string | null;
+  start_date_local: string | null;
+  distance: number | null;
+  moving_time: number | null;
+  elapsed_time: number | null;
+  total_elevation_gain: number | null;
+  average_heartrate: number | null;
+  average_watts: number | null;
+  weighted_average_watts: number | null;
+  gear_id: string | null;
+  trainer: boolean | null;
+  commute: boolean | null;
+  has_laps: boolean;
+  has_splits: boolean;
+  has_segments: boolean;
+  has_best_efforts: boolean;
+  has_zones: boolean;
+  has_streams: boolean;
+  last_ingested_at: string | null;
+  deleted_at: string | null;
+};
+
+export type IngestedActivitiesResponse = {
+  items: IngestedActivity[];
+  page: number;
+  per_page: number;
+  total: number;
+};
+
+export type BackfillRun = {
+  id: number;
+  athlete_id: number;
+  start_date: string;
+  end_date: string;
+  force_refresh: boolean;
+  status: string;
+  requested_count: number;
+  missing_count: number;
+  queued_count: number;
+  succeeded_count: number;
+  failed_count: number;
+  skipped_count: number;
+  last_error: string | null;
+  created_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string | null;
+};
+
+export type BackfillJob = {
+  id: number;
+  activity_id: number;
+  athlete_id: number | null;
+  trigger_type: string;
+  aspect_type: string | null;
+  status: string;
+  attempt_count: number;
+  last_error: string | null;
+  queued_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string | null;
+};
+
 export type SettingsUpdate = {
   run_shoe_enabled?: boolean;
   gym_hide_enabled?: boolean;
@@ -116,6 +186,62 @@ export async function retryActivity(activityId: number): Promise<void> {
 export async function fetchActivities(page = 1): Promise<StravaActivity[]> {
   const params = new URLSearchParams({ page: String(page), per_page: "15" });
   return getJson<StravaActivity[]>(`/ui/activities?${params}`);
+}
+
+export async function fetchIngestedActivities(page = 1): Promise<IngestedActivitiesResponse> {
+  const params = new URLSearchParams({ page: String(page), per_page: "25" });
+  return getJson<IngestedActivitiesResponse>(`/ui/ingested-activities?${params}`);
+}
+
+export async function createBackfill(input: {
+  start_date: string;
+  end_date: string;
+  force_refresh: boolean;
+}): Promise<BackfillRun> {
+  const response = await fetch(`${API_BASE}/ui/backfill`, {
+    ...FETCH_OPTS,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Backfill failed: ${response.status}`);
+  return (await response.json()) as BackfillRun;
+}
+
+export async function fetchBackfill(id: number): Promise<BackfillRun> {
+  return getJson<BackfillRun>(`/ui/backfill/${id}`);
+}
+
+export async function fetchBackfillJobs(id: number): Promise<BackfillJob[]> {
+  return getJson<BackfillJob[]>(`/ui/backfill/${id}/jobs`);
+}
+
+export async function retryFailedBackfill(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/ui/backfill/${id}/retry-failed`, {
+    ...FETCH_OPTS,
+    method: "POST"
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Retry failed: ${response.status}`);
+}
+
+export async function cancelBackfill(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/ui/backfill/${id}/cancel`, {
+    ...FETCH_OPTS,
+    method: "POST"
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Cancel failed: ${response.status}`);
+}
+
+export async function cleanupIngestedActivities(): Promise<void> {
+  const response = await fetch(`${API_BASE}/ui/ingested-activities/dev-cleanup`, {
+    ...FETCH_OPTS,
+    method: "DELETE"
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Cleanup failed: ${response.status}`);
 }
 
 export type ShoeVaultEntry = {

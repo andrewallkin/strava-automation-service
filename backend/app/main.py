@@ -32,6 +32,7 @@ def _configure_logging() -> None:
             "telegram":       {"handlers": ["console"], "level": log_level, "propagate": False},
             "auth":           {"handlers": ["console"], "level": log_level, "propagate": False},
             "db":             {"handlers": ["console"], "level": log_level, "propagate": False},
+            "ingestion":      {"handlers": ["console"], "level": log_level, "propagate": False},
         },
         "root": {"handlers": ["console"], "level": "WARNING"},
     })
@@ -42,6 +43,7 @@ _configure_logging()
 app = FastAPI(title="Strava Automation Service")
 
 from app.routers.auth import logout_router, router as auth_router
+from app.routers.backfill_api import router as backfill_router
 from app.routers.strava_webhook import router as strava_router
 from app.routers.telegram_webhook import router as telegram_router
 from app.routers.ui_api import router as ui_router
@@ -51,6 +53,7 @@ app.include_router(logout_router)
 app.include_router(strava_router)
 app.include_router(telegram_router)
 app.include_router(ui_router)
+app.include_router(backfill_router)
 
 
 @app.get("/api/health")

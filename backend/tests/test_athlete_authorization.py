@@ -37,7 +37,10 @@ def test_strava_webhook_ignores_unauthorized_owner() -> None:
     mock_settings = MagicMock()
     mock_settings.strava_allowed_athlete_id = 14460791
 
-    with patch("app.routers.strava_webhook.get_settings", return_value=mock_settings):
+    with (
+        patch("app.routers.strava_webhook.get_settings", return_value=mock_settings),
+        patch("app.routers.strava_webhook.log_event"),
+    ):
         client = TestClient(app)
         response = client.post(
             "/api/strava/webhook",
