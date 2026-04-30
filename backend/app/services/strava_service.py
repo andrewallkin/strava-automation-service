@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 from fastapi import HTTPException
@@ -10,6 +12,8 @@ from app.models import User
 from app.services.activity_service import upsert_gear
 
 STRAVA_BASE_URL = "https://www.strava.com"
+STRAVA_API_PREFIX = "/api/v3"
+STRAVA_EXPLORER_METHODS = {"GET", "POST", "PUT", "DELETE"}
 
 
 class StravaService:
@@ -105,6 +109,74 @@ class StravaService:
 
     def _headers(self, token: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"}
+
+    def explore_api(
+        self,
+        db: Session,
+        user: User,
+        method: str,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        body: Any | None = None,
+        body_encoding: str = "json",
+    ) -> dict:
+        method = method.upper()
+        if method not in STRAVA_EXPLORER_METHODS:
+            raise HTTPException(status_code=400, detail="Unsupported Strava API method")
+
+        parts = urlsplit(endpoint.strip())
+        if parts.scheme or parts.netloc:
+            raise HTTPException(status_code=400, detail="Use a Strava API path, not a full URL")
+
+        path = parts.path or ""
+        if not path.startswith("/"):
+            path = f"/{path}"
+        if ".." in path.split("/"):
+            raise HTTPException(status_code=400, detail="Endpoint cannot contain path traversal")
+        if not path.startswith(STRAVA_API_PREFIX):
+            path = f"{STRAVA_API_PREFIX}{path}"
+        if not path.startswith(f"{STRAVA_API_PREFIX}/") and path != STRAVA_API_PREFIX:
+            raise HTTPException(status_code=400, detail="Endpoint must stay within /api/v3")
+
+        query_params: dict[str, Any] = {}
+        for key, values in parse_qs(parts.query, keep_blank_values=True).items():
+            query_params[key] = values if len(values) > 1 else values[0]
+        if params:
+            query_params.update(params)
+
+        user = self.ensure_fresh_token(db, user)
+        request_kwargs: dict[str, Any] = {
+            "headers": self._headers(user.access_token or ""),
+            "params": query_params or None,
+            "timeout": 30,
+        }
+        if method not in {"GET", "DELETE"} and body is not None:
+            if body_encoding == "form":
+                request_kwargs["data"] = body
+            else:
+                request_kwargs["json"] = body
+
+        resp = httpx.request(method, f"{STRAVA_BASE_URL}{path}", **request_kwargs)
+        content_type = resp.headers.get("content-type", "")
+        if resp.content and "application/json" in content_type:
+            response_body: Any = resp.json()
+        elif resp.content:
+            response_body = resp.text
+        else:
+            response_body = None
+
+        return {
+            "method": method,
+            "endpoint": path,
+            "url": str(resp.request.url),
+            "status_code": resp.status_code,
+            "headers": {
+                key: value
+                for key, value in resp.headers.items()
+                if key.lower().startswith("x-ratelimit") or key.lower() == "content-type"
+            },
+            "body": response_body,
+        }
 
     def get_activity(self, db: Session, activity_id: int, user: User) -> dict:
         user = self.ensure_fresh_token(db, user)

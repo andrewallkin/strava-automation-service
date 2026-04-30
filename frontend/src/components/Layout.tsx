@@ -10,6 +10,7 @@ const tabs = [
   { to: "/", label: "Home" },
   { to: "/activities", label: "Activities" },
   { to: "/ingestion", label: "Ingestion" },
+  { to: "/strava-explorer", label: "API Explorer" },
   { to: "/events", label: "Events" },
   { to: "/settings", label: "Settings" },
 ];

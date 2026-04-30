@@ -1,5 +1,6 @@
 import json
 from datetime import date, timedelta
+from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -21,6 +22,14 @@ class SettingsUpdate(BaseModel):
     gym_hide_enabled: bool | None = None
 
 
+class StravaExplorerRequest(BaseModel):
+    method: Literal["GET", "POST", "PUT", "DELETE"] = "GET"
+    endpoint: str
+    params: dict[str, Any] | None = None
+    body: Any | None = None
+    body_encoding: Literal["json", "form"] = "json"
+
+
 @router.get("/status")
 def status(
     user: User = Depends(require_jwt_user),
@@ -33,6 +42,26 @@ def status(
         "run_shoe_enabled": user.run_shoe_enabled,
         "gym_hide_enabled": user.gym_hide_enabled,
     }
+
+
+@router.post("/strava-explorer")
+def strava_explorer(
+    body: StravaExplorerRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not user.access_token:
+        raise HTTPException(status_code=404, detail="No user connected")
+    strava = StravaService()
+    return strava.explore_api(
+        db,
+        user,
+        method=body.method,
+        endpoint=body.endpoint,
+        params=body.params,
+        body=body.body,
+        body_encoding=body.body_encoding,
+    )
 
 
 @router.patch("/settings")

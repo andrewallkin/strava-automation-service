@@ -131,6 +131,25 @@ export type EventRow = {
   created_at: string;
 };
 
+export type StravaExplorerMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+export type StravaExplorerRequest = {
+  method: StravaExplorerMethod;
+  endpoint: string;
+  params?: Record<string, unknown>;
+  body?: unknown;
+  body_encoding?: "json" | "form";
+};
+
+export type StravaExplorerResponse = {
+  method: StravaExplorerMethod;
+  endpoint: string;
+  url: string;
+  status_code: number;
+  headers: Record<string, string>;
+  body: unknown;
+};
+
 async function getJson<T>(path: string, redirectOn401 = true): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, FETCH_OPTS);
   handle401(response, redirectOn401);
@@ -170,6 +189,23 @@ export async function fetchPending(): Promise<PendingActivity[]> {
 
 export async function fetchEvents(): Promise<EventRow[]> {
   return getJson<EventRow[]>("/ui/events");
+}
+
+export async function callStravaExplorer(
+  request: StravaExplorerRequest
+): Promise<StravaExplorerResponse> {
+  const response = await fetch(`${API_BASE}/ui/strava-explorer`, {
+    ...FETCH_OPTS,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request)
+  });
+  handle401(response, true);
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed: ${response.status}`);
+  }
+  return (await response.json()) as StravaExplorerResponse;
 }
 
 export async function retryActivity(activityId: number): Promise<void> {
