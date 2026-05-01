@@ -25,7 +25,7 @@ services:
       context: ./backend
     command: ["python", "-m", "app.mcp.server"]
     ports:
-      - "${MCP_PORT:-8003}:8000"
+      - "${MCP_PORT:-8004}:8000"
     depends_on:
       - api
     env_file:
