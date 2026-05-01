@@ -121,6 +121,16 @@ export type SettingsUpdate = {
   gym_hide_enabled?: boolean;
 };
 
+export type McpApiKey = {
+  id: number;
+  name: string | null;
+  key_prefix: string;
+  created_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  api_key?: string;
+};
+
 export type EventRow = {
   id: number;
   event_type: string;
@@ -177,6 +187,31 @@ export async function updateSettings(settings: SettingsUpdate): Promise<Status> 
   handle401(response, true);
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return (await response.json()) as Status;
+}
+
+export async function fetchMcpApiKeys(): Promise<McpApiKey[]> {
+  return getJson<McpApiKey[]>("/ui/mcp-api-keys");
+}
+
+export async function createMcpApiKey(name?: string): Promise<McpApiKey> {
+  const response = await fetch(`${API_BASE}/ui/mcp-api-keys`, {
+    ...FETCH_OPTS,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name || null })
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Key generation failed: ${response.status}`);
+  return (await response.json()) as McpApiKey;
+}
+
+export async function revokeMcpApiKey(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/ui/mcp-api-keys/${id}`, {
+    ...FETCH_OPTS,
+    method: "DELETE"
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Revoke failed: ${response.status}`);
 }
 
 export async function fetchSummary(): Promise<Summary> {

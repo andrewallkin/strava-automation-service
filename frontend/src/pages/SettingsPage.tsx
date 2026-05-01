@@ -1,5 +1,13 @@
-import { useState } from "react";
-import { Status, disconnectStrava, updateSettings } from "../lib/api";
+import { useEffect, useState } from "react";
+import {
+  McpApiKey,
+  Status,
+  createMcpApiKey,
+  disconnectStrava,
+  fetchMcpApiKeys,
+  revokeMcpApiKey,
+  updateSettings
+} from "../lib/api";
 
 function Toggle({
   checked,
@@ -39,6 +47,15 @@ type SettingsPageProps = {
 export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
   const [localStatus, setLocalStatus] = useState<Status>(status);
   const [message, setMessage] = useState<string | null>(null);
+  const [mcpKeys, setMcpKeys] = useState<McpApiKey[]>([]);
+  const [newMcpKey, setNewMcpKey] = useState<string | null>(null);
+  const [mcpKeyName, setMcpKeyName] = useState("Claude Desktop");
+
+  useEffect(() => {
+    fetchMcpApiKeys()
+      .then(setMcpKeys)
+      .catch((err) => setMessage(err instanceof Error ? err.message : "Failed to load MCP keys"));
+  }, []);
 
   const handleToggle = async (key: "run_shoe_enabled" | "gym_hide_enabled", value: boolean) => {
     try {
@@ -60,8 +77,41 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
     }
   };
 
+  const handleCreateMcpKey = async () => {
+    try {
+      const created = await createMcpApiKey(mcpKeyName);
+      setNewMcpKey(created.api_key ?? null);
+      setMcpKeys((current) => [created, ...current]);
+      setMessage(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to generate MCP key");
+    }
+  };
+
+  const handleRevokeMcpKey = async (id: number) => {
+    try {
+      await revokeMcpApiKey(id);
+      setMcpKeys((current) => current.filter((key) => key.id !== id));
+      setMessage(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to revoke MCP key");
+    }
+  };
+
+  const claudeConfig = `{
+  "mcpServers": {
+    "strava-vps": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/proxy-server", "https://strava.andrewallkin.cloud/mcp/sse"],
+      "env": {
+        "HTTP_HEADERS": "{\\"Authorization\\": \\"Bearer YOUR_KEY\\"}"
+      }
+    }
+  }
+}`;
+
   return (
-    <div className="max-w-lg space-y-4">
+    <div className="max-w-2xl space-y-4">
       {message && (
         <div
           role="alert"
@@ -103,6 +153,87 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
             checked={localStatus.gym_hide_enabled}
             onChange={(val) => handleToggle("gym_hide_enabled", val)}
           />
+        </div>
+      </div>
+
+      {/* MCP */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
+        <div className="px-5 py-4">
+          <h2 className="text-sm font-semibold text-gray-900">MCP access</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Generate a bearer token for Claude Desktop or another MCP client. The token can only read
+            activities for your connected Strava athlete.
+          </p>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              value={mcpKeyName}
+              onChange={(event) => setMcpKeyName(event.target.value)}
+              placeholder="Key name"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            />
+            <button
+              type="button"
+              onClick={handleCreateMcpKey}
+              className="px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 transition-colors"
+            >
+              Generate key
+            </button>
+          </div>
+
+          {newMcpKey && (
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+              <p className="text-xs font-medium text-orange-900">
+                Copy this key now. It will not be shown again.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <code className="flex-1 break-all rounded bg-white px-2 py-1 text-xs text-gray-800">
+                  {newMcpKey}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(newMcpKey)}
+                  className="px-3 py-1 text-xs font-medium text-orange-700 bg-white border border-orange-200 rounded-md hover:bg-orange-100"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {mcpKeys.length === 0 ? (
+              <p className="text-xs text-gray-500">No MCP keys yet.</p>
+            ) : (
+              mcpKeys.map((key) => (
+                <div key={key.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{key.name || "Unnamed key"}</p>
+                    <p className="text-xs text-gray-500">
+                      Prefix {key.key_prefix} - Created {key.created_at ? new Date(key.created_at).toLocaleString() : "unknown"}
+                      {key.last_used_at ? ` - Last used ${new Date(key.last_used_at).toLocaleString()}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRevokeMcpKey(key.id)}
+                    className="px-3 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1">Claude Desktop proxy example</p>
+            <pre className="overflow-x-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100">
+              {claudeConfig}
+            </pre>
+          </div>
         </div>
       </div>
 

@@ -35,6 +35,23 @@ class User(Base):
     athlete_profile_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class McpApiKey(Base):
+    __tablename__ = "mcp_api_keys"
+    __table_args__ = (
+        Index("idx_mcp_api_keys_user", "user_id", "created_at"),
+        Index("idx_mcp_api_keys_hash", "key_hash", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Gear(Base):
     __tablename__ = "gear"
 

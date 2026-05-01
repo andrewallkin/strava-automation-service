@@ -63,29 +63,20 @@ backend/
 
 The SSE endpoint must not be public without authentication.
 
-Recommended environment variable:
-
-```dotenv
-MCP_API_TOKEN=<long_random_secret>
-```
+The PoC uses per-user API keys generated from the web UI. Only a hash of each key is stored in Postgres, and the raw key is shown once when generated.
 
 Recommended HTTP header:
 
 ```text
-Authorization: Bearer <long_random_secret>
+Authorization: Bearer <generated_mcp_api_key>
 ```
 
-or:
-
-```text
-X-MCP-Token: <long_random_secret>
-```
-
-Use one style consistently. Prefer `Authorization: Bearer` unless the proxy tooling makes a custom header easier.
+Use `Authorization: Bearer` consistently so clients and nginx only need to forward the standard authorization header.
 
 Security requirements:
 
-- Compare tokens using constant-time comparison.
+- Store only hashed API keys.
+- Scope every query to the API key owner's connected Strava athlete ID.
 - Reject missing or invalid tokens with `401`.
 - Serve only over HTTPS in production.
 - Keep the MCP server read-only for the first implementation.
@@ -133,24 +124,14 @@ Example `claude_desktop_config.json`:
         "https://strava.andrewallkin.cloud/mcp/sse"
       ],
       "env": {
-        "HTTP_HEADERS": "{\"Authorization\": \"Bearer your_secret_vps_passcode\"}"
+        "HTTP_HEADERS": "{\"Authorization\": \"Bearer your_generated_mcp_api_key\"}"
       }
     }
   }
 }
 ```
 
-If using `X-MCP-Token` instead:
-
-```json
-{
-  "env": {
-    "HTTP_HEADERS": "{\"X-MCP-Token\": \"your_secret_vps_passcode\"}"
-  }
-}
-```
-
-Keep the real token out of the repository.
+Keep the real key out of the repository.
 
 ## Nginx Routing
 
@@ -158,19 +139,21 @@ Example production routing:
 
 ```nginx
 location /mcp/ {
-    proxy_pass http://127.0.0.1:8003;
+    proxy_pass http://127.0.0.1:8003/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Authorization $http_authorization;
     proxy_buffering off;
     proxy_cache off;
+    proxy_read_timeout 3600s;
 }
 ```
 
 SSE connections are long-lived, so buffering should be disabled for the MCP route.
 
-The existing `/api/` and frontend routes from `docs/VPS-DEPLOYMENT.md` should remain unchanged.
+The existing `/api/` and frontend routes from `docs/VPS-DEPLOYMENT.md` should remain unchanged. A separate MCP subdomain is not required for the PoC; path-based routing under the existing `strava.andrewallkin.cloud` certificate is enough.
 
 ## Tool Design Principles
 

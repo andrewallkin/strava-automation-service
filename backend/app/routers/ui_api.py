@@ -11,6 +11,7 @@ from app.db import get_db
 from app.deps import require_jwt_user
 from app.models import EventLog, PendingActivity, User
 from app.services.activity_service import list_gear
+from app.services.mcp_api_key_service import create_mcp_api_key, list_mcp_api_keys, revoke_mcp_api_key
 from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
 
@@ -20,6 +21,10 @@ router = APIRouter(prefix="/api/ui", tags=["ui"])
 class SettingsUpdate(BaseModel):
     run_shoe_enabled: bool | None = None
     gym_hide_enabled: bool | None = None
+
+
+class McpApiKeyCreate(BaseModel):
+    name: str | None = None
 
 
 class StravaExplorerRequest(BaseModel):
@@ -80,6 +85,51 @@ def update_settings(
         "run_shoe_enabled": user.run_shoe_enabled,
         "gym_hide_enabled": user.gym_hide_enabled,
     }
+
+
+def _mcp_api_key_row(row, include_secret: str | None = None) -> dict:
+    data = {
+        "id": row.id,
+        "name": row.name,
+        "key_prefix": row.key_prefix,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "last_used_at": row.last_used_at.isoformat() if row.last_used_at else None,
+        "revoked_at": row.revoked_at.isoformat() if row.revoked_at else None,
+    }
+    if include_secret is not None:
+        data["api_key"] = include_secret
+    return data
+
+
+@router.get("/mcp-api-keys")
+def mcp_api_keys(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> list[dict]:
+    return [_mcp_api_key_row(row) for row in list_mcp_api_keys(db, user)]
+
+
+@router.post("/mcp-api-keys")
+def create_mcp_key(
+    body: McpApiKeyCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not user.strava_athlete_id:
+        raise HTTPException(status_code=404, detail="No connected Strava user")
+    created = create_mcp_api_key(db, user, name=body.name)
+    return _mcp_api_key_row(created.row, include_secret=created.raw_key)
+
+
+@router.delete("/mcp-api-keys/{key_id}")
+def revoke_mcp_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    if not revoke_mcp_api_key(db, user, key_id):
+        raise HTTPException(status_code=404, detail="MCP API key not found")
+    return {"revoked": True}
 
 
 @router.get("/summary")
