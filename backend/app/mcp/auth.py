@@ -20,7 +20,8 @@ def extract_bearer_token(headers: dict[str, str]) -> str:
 
 
 def require_mcp_user() -> User:
-    token = extract_bearer_token(dict(get_http_headers()))
+    # FastMCP strips Authorization from get_http_headers() by default; include it explicitly.
+    token = extract_bearer_token(dict(get_http_headers(include={"authorization"})))
     with SessionLocal() as db:
         user = authenticate_mcp_api_key(db, token)
         if not user:

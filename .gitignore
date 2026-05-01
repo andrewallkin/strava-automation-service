@@ -1,12 +1,35 @@
+# Environment & secrets
 .env
-__pycache__/
-*.pyc
-.pytest_cache/
-.DS_Store
+.env.local
+.env.*.local
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+*.egg-info/
+.venv/
+venv/
+
+# Node / frontend
 frontend/node_modules/
 frontend/dist/
+*.tsbuildinfo
 
+# OS & editors
+.DS_Store
+.idea/
+*.swp
+*.swo
+
+# Docker / local data
 postgres_data/
 
+# Project-specific
 /strava_api_responses
