@@ -467,11 +467,11 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
           {data.this_week.days.some((d) => d.count > 0) && (
             <div className="pt-1 border-t border-gray-100">
               {/* Column headers */}
-              <div className="grid grid-cols-[5rem_1fr_3.5rem_3rem_4rem_3rem] gap-x-2 px-1 pb-1 text-[10px] font-medium text-gray-400 uppercase tracking-wide">
+              <div className="grid grid-cols-[5rem_1fr_3.5rem_minmax(6.25rem,max-content)_4rem_3rem] gap-x-2 px-1 pb-1 text-[10px] font-medium text-gray-400 uppercase tracking-wide">
                 <span>Day</span>
                 <span>Activity</span>
                 <span className="text-right">📏 km</span>
-                <span className="text-right">⏱ time</span>
+                <span className="text-right whitespace-nowrap">⏱ time</span>
                 <span className="text-right">⚡ pace</span>
                 <span className="text-right">⛰ elev</span>
               </div>
@@ -480,12 +480,14 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
                   day.activities.map((act, j) => (
                     <div
                       key={`${i}-${j}`}
-                      className="grid grid-cols-[5rem_1fr_3.5rem_3rem_4rem_3rem] gap-x-2 items-center px-1 py-1 rounded-lg bg-gray-50 text-xs"
+                      className="grid grid-cols-[5rem_1fr_3.5rem_minmax(6.25rem,max-content)_4rem_3rem] gap-x-2 items-center px-1 py-1 rounded-lg bg-gray-50 text-xs"
                     >
                       <span className="text-gray-400 font-medium">{FULL_DAY_NAMES[i]}</span>
                       <span className="text-gray-900 font-medium truncate">{act.name}</span>
                       <span className="text-right text-orange-600 font-semibold">{act.km.toFixed(1)}</span>
-                      <span className="text-right text-gray-600">{formatMovingTime(act.moving_time_s)}</span>
+                      <span className="text-right text-gray-600 whitespace-nowrap tabular-nums">
+                        {formatMovingTime(act.moving_time_s)}
+                      </span>
                       <span className="text-right text-blue-600 font-medium">{formatRunPace(act.km, act.moving_time_s)}</span>
                       <span className="text-right text-gray-500">{act.elevation_m > 0 ? `${act.elevation_m}m` : "—"}</span>
                     </div>
