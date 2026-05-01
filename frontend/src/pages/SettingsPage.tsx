@@ -9,6 +9,55 @@ import {
   updateSettings
 } from "../lib/api";
 
+/** Clipboard API can fail silently over HTTP or without permission; fall back to execCommand. */
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (window.isSecureContext && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Matches working Cursor setup: mcp-remote + env-based Bearer (avoids clients splitting args on spaces). */
+const MCP_CLIENT_JSON = `{
+  "mcpServers": {
+    "strava-vps-remote": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://strava.andrewallkin.cloud/mcp/sse",
+        "--transport",
+        "sse-only",
+        "--header",
+        "Authorization:\${STRAVA_MCP_AUTH_HEADER}"
+      ],
+      "env": {
+        "STRAVA_MCP_AUTH_HEADER": "Bearer YOUR_SVA_MCP_KEY_HERE"
+      }
+    }
+  }
+}`;
+
 function Toggle({
   checked,
   onChange,
@@ -39,6 +88,8 @@ function Toggle({
   );
 }
 
+type CopyNotice = { ok: boolean; text: string };
+
 type SettingsPageProps = {
   status: Status;
   onStatusChange: (s: Status | null) => void;
@@ -50,6 +101,8 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
   const [mcpKeys, setMcpKeys] = useState<McpApiKey[]>([]);
   const [newMcpKey, setNewMcpKey] = useState<string | null>(null);
   const [mcpKeyName, setMcpKeyName] = useState("Claude Desktop");
+  const [mcpKeyCopyNotice, setMcpKeyCopyNotice] = useState<CopyNotice | null>(null);
+  const [mcpConfigCopyNotice, setMcpConfigCopyNotice] = useState<CopyNotice | null>(null);
 
   useEffect(() => {
     fetchMcpApiKeys()
@@ -83,6 +136,7 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
       setNewMcpKey(created.api_key ?? null);
       setMcpKeys((current) => [created, ...current]);
       setMessage(null);
+      setMcpKeyCopyNotice(null);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to generate MCP key");
     }
@@ -97,18 +151,6 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
       setMessage(err instanceof Error ? err.message : "Failed to revoke MCP key");
     }
   };
-
-  const claudeConfig = `{
-  "mcpServers": {
-    "strava-vps": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/proxy-server", "https://strava.andrewallkin.cloud/mcp/sse"],
-      "env": {
-        "HTTP_HEADERS": "{\\"Authorization\\": \\"Bearer YOUR_KEY\\"}"
-      }
-    }
-  }
-}`;
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -161,8 +203,9 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
         <div className="px-5 py-4">
           <h2 className="text-sm font-semibold text-gray-900">MCP access</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Generate a bearer token for Claude Desktop or another MCP client. The token can only read
-            activities for your connected Strava athlete.
+            Generate an API key for Cursor, Claude Desktop, or any MCP client over{" "}
+            <code className="text-gray-700">mcp-remote</code>. Keys can only read activities for your
+            connected Strava athlete (same tools as the hosted MCP server).
           </p>
         </div>
 
@@ -188,18 +231,39 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
               <p className="text-xs font-medium text-orange-900">
                 Copy this key now. It will not be shown again.
               </p>
-              <div className="mt-2 flex gap-2">
-                <code className="flex-1 break-all rounded bg-white px-2 py-1 text-xs text-gray-800">
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <code
+                  id="new-mcp-key-value"
+                  className="flex-1 break-all rounded bg-white px-2 py-1 text-xs text-gray-800"
+                >
                   {newMcpKey}
                 </code>
                 <button
                   type="button"
-                  onClick={() => navigator.clipboard?.writeText(newMcpKey)}
-                  className="px-3 py-1 text-xs font-medium text-orange-700 bg-white border border-orange-200 rounded-md hover:bg-orange-100"
+                  onClick={async () => {
+                    const ok = await copyToClipboard(newMcpKey);
+                    setMcpKeyCopyNotice(
+                      ok
+                        ? { ok: true, text: "Key copied." }
+                        : {
+                            ok: false,
+                            text: "Could not copy automatically — select the key above and press ⌘C / Ctrl+C."
+                          }
+                    );
+                  }}
+                  className="px-3 py-1 text-xs font-medium text-orange-700 bg-white border border-orange-200 rounded-md hover:bg-orange-100 shrink-0 self-start sm:self-auto"
                 >
-                  Copy
+                  Copy key
                 </button>
               </div>
+              {mcpKeyCopyNotice && (
+                <p
+                  className={`mt-2 text-xs ${mcpKeyCopyNotice.ok ? "text-green-800" : "text-orange-900"}`}
+                  role="status"
+                >
+                  {mcpKeyCopyNotice.text}
+                </p>
+              )}
             </div>
           )}
 
@@ -229,9 +293,51 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
           </div>
 
           <div>
-            <p className="text-xs font-medium text-gray-700 mb-1">Claude Desktop proxy example</p>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <p className="text-xs font-medium text-gray-700">
+                Cursor / Claude Desktop (<code className="text-gray-600">~/.cursor/mcp.json</code> etc.)
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  const ok = await copyToClipboard(MCP_CLIENT_JSON);
+                  setMcpConfigCopyNotice(
+                    ok
+                      ? { ok: true, text: "Config JSON copied." }
+                      : {
+                          ok: false,
+                          text: "Could not copy automatically — select the JSON below and copy manually."
+                        }
+                  );
+                }}
+                className="px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-md hover:bg-gray-200"
+              >
+                Copy JSON
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-2">
+              Uses <code className="text-gray-700">npx mcp-remote</code> with{" "}
+              <code className="text-gray-700">--transport sse-only</code>. Put your full key (including{" "}
+              <code className="text-gray-700">sva_mcp_…</code>) in place of{" "}
+              <code className="text-gray-700">YOUR_SVA_MCP_KEY_HERE</code> — keep the{" "}
+              <code className="text-gray-700">Bearer </code>
+              prefix inside <code className="text-gray-700">STRAVA_MCP_AUTH_HEADER</code>. The{" "}
+              <code className="text-gray-700">--header</code> line is{" "}
+              <code className="text-gray-700">{'Authorization:${STRAVA_MCP_AUTH_HEADER}'}</code> so{" "}
+              <code className="text-gray-700">mcp-remote</code> expands the env var (some MCP hosts split{" "}
+              <code className="text-gray-700">args</code> on spaces if you put <code className="text-gray-700">Bearer</code>{" "}
+              and the token in one string).
+            </p>
+            {mcpConfigCopyNotice && (
+              <p
+                className={`text-xs mb-2 ${mcpConfigCopyNotice.ok ? "text-green-800" : "text-orange-900"}`}
+                role="status"
+              >
+                {mcpConfigCopyNotice.text}
+              </p>
+            )}
             <pre className="overflow-x-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100">
-              {claudeConfig}
+              {MCP_CLIENT_JSON}
             </pre>
           </div>
         </div>
