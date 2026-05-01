@@ -1,6 +1,6 @@
 """redesign strava analytics schema
 
-Revision ID: 0005_redesign_strava_analytics_schema
+Revision ID: 0005_strava_mcp_schema
 Revises: 0004_strava_ingestion_tables
 Create Date: 2026-05-01
 """
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0005_redesign_strava_analytics_schema"
+revision: str = "0005_strava_mcp_schema"
 down_revision: str | None = "0004_strava_ingestion_tables"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
