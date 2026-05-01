@@ -34,6 +34,30 @@ def test_get_activity_zones_tolerates_unavailable_response() -> None:
     response.raise_for_status.assert_not_called()
 
 
+def test_get_athlete_zones_tolerates_unavailable_response() -> None:
+    response = MagicMock()
+    response.status_code = 403
+
+    with patch("app.services.strava_service.httpx.get", return_value=response):
+        result = StravaService().get_athlete_zones(MagicMock(), _user())
+
+    assert result is None
+    response.raise_for_status.assert_not_called()
+
+
+def test_get_athlete_zones_fetches_zone_snapshot() -> None:
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {"heart_rate": {"zones": [{"min": 0, "max": 120}]}}
+
+    with patch("app.services.strava_service.httpx.get", return_value=response) as mock_get:
+        result = StravaService().get_athlete_zones(MagicMock(), _user())
+
+    assert result == {"heart_rate": {"zones": [{"min": 0, "max": 120}]}}
+    response.raise_for_status.assert_called_once()
+    assert mock_get.call_args.args[0].endswith("/api/v3/athlete/zones")
+
+
 def test_get_athlete_activities_between_paginates_until_short_page() -> None:
     first = MagicMock()
     first.json.return_value = [{"id": i} for i in range(200)]

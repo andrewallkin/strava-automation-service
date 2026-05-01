@@ -9,10 +9,10 @@ from app.models import (
     StravaActivity,
     StravaActivityBestEffort,
     StravaActivityLap,
-    StravaActivitySegmentEffort,
+    StravaActivityMetric,
     StravaActivitySplit,
-    StravaActivityStream,
-    StravaActivityZone,
+    StravaActivityZoneBucket,
+    StravaAthleteZone,
     StravaBackfillRun,
     StravaIngestionJob,
     User,
@@ -220,11 +220,11 @@ def cancel_backfill_run(backfill_run_id: int) -> bool:
 def cleanup_ingestion_tables() -> None:
     with SessionLocal() as db:
         for model in (
-            StravaActivityStream,
-            StravaActivityZone,
+            StravaActivityMetric,
+            StravaAthleteZone,
+            StravaActivityZoneBucket,
             StravaActivityBestEffort,
             StravaActivitySplit,
-            StravaActivitySegmentEffort,
             StravaActivityLap,
             StravaIngestionJob,
             StravaBackfillRun,

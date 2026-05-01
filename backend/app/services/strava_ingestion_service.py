@@ -1,17 +1,18 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.db import SessionLocal
 from app.models import (
     StravaActivity,
     StravaActivityBestEffort,
     StravaActivityLap,
-    StravaActivitySegmentEffort,
+    StravaActivityMetric,
     StravaActivitySplit,
-    StravaActivityZone,
+    StravaActivityZoneBucket,
+    StravaAthleteZone,
     StravaIngestionJob,
     User,
 )
@@ -42,13 +43,38 @@ def _athlete_id(payload: dict[str, Any], owner_id: int | None = None) -> int | N
     return owner_id
 
 
-def _activity_map(payload: dict[str, Any]) -> dict[str, Any]:
-    value = payload.get("map")
-    return value if isinstance(value, dict) else {}
-
-
 def _bool(value: Any) -> bool:
     return bool(value) if value is not None else False
+
+
+def _cadence_spm(value: Any) -> float | None:
+    return float(value) * 2 if value is not None else None
+
+
+def _gap_source(value: Any) -> str:
+    return "strava" if value is not None else "unavailable"
+
+
+def _local_parts(value: datetime | None) -> tuple[date | None, int | None, int | None, int | None]:
+    if value is None:
+        return None, None, None, None
+    return value.date(), value.year, value.month, value.isocalendar().week
+
+
+def _seconds_per_km(distance_m: float | None, seconds: int | None) -> float | None:
+    if not distance_m or distance_m <= 0 or seconds is None:
+        return None
+    return seconds / (distance_m / 1000)
+
+
+def _mps_to_seconds_per_km(value: float | None) -> float | None:
+    if not value or value <= 0:
+        return None
+    return 1000 / value
+
+
+def _mps_to_kmh(value: float | None) -> float | None:
+    return value * 3.6 if value is not None else None
 
 
 def _load_user(db, owner_id: int | None) -> User | None:
@@ -59,28 +85,28 @@ def _load_user(db, owner_id: int | None) -> User | None:
     return db.scalar(select(User).limit(1))
 
 
-def _metadata(
+def _data_quality(
     detail: dict[str, Any],
     laps: list[dict[str, Any]],
     zones: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
     splits_metric = detail.get("splits_metric") or []
     splits_standard = detail.get("splits_standard") or []
-    segments = detail.get("segment_efforts") or []
-    best_efforts = detail.get("best_efforts") or []
+    zone_bucket_count = sum(len(zone.get("distribution_buckets") or []) for zone in zones or [])
     return {
+        "has_activity_zones": bool(zones),
+        "has_athlete_zones_snapshot": False,
         "has_laps": bool(laps),
         "has_splits": bool(splits_metric or splits_standard),
-        "has_segments": bool(segments),
-        "has_best_efforts": bool(best_efforts),
-        "has_zones": bool(zones),
-        "has_streams": False,
-        "stream_fetch_deferred": True,
+        "has_best_efforts": bool(detail.get("best_efforts") or []),
+        "has_gap": detail.get("average_grade_adjusted_speed") is not None,
+        "gap_source": _gap_source(detail.get("average_grade_adjusted_speed")),
         "split_sources": [
             source
             for source, values in (("metric", splits_metric), ("standard", splits_standard))
             if values
         ],
+        "zone_bucket_count": zone_bucket_count,
     }
 
 
@@ -94,8 +120,10 @@ def _upsert_activity(
     now = _now()
     activity_id = int(detail["id"])
     existing = db.get(StravaActivity, activity_id)
-    metadata = _metadata(detail, laps, zones)
-    map_data = _activity_map(detail)
+    start_date_local = _parse_dt(detail.get("start_date_local"))
+    local_date, local_year, local_month, local_week = _local_parts(start_date_local)
+    average_gap = detail.get("average_grade_adjusted_speed")
+    data_quality = _data_quality(detail, laps, zones)
     activity = existing or StravaActivity(activity_id=activity_id, first_ingested_at=now)
 
     activity.athlete_id = int(_athlete_id(detail, owner_id) or 0)
@@ -103,21 +131,28 @@ def _upsert_activity(
     activity.description = detail.get("description")
     activity.activity_type = detail.get("type")
     activity.sport_type = detail.get("sport_type")
+    activity.workout_type = detail.get("workout_type")
     activity.start_date = _parse_dt(detail.get("start_date"))
-    activity.start_date_local = _parse_dt(detail.get("start_date_local"))
+    activity.start_date_local = start_date_local
     activity.timezone = detail.get("timezone")
-    activity.distance = detail.get("distance")
-    activity.moving_time = detail.get("moving_time")
-    activity.elapsed_time = detail.get("elapsed_time")
-    activity.total_elevation_gain = detail.get("total_elevation_gain")
-    activity.elev_high = detail.get("elev_high")
-    activity.elev_low = detail.get("elev_low")
-    activity.average_speed = detail.get("average_speed")
-    activity.max_speed = detail.get("max_speed")
+    activity.local_date = local_date
+    activity.local_year = local_year
+    activity.local_month = local_month
+    activity.local_week = local_week
+    activity.distance_m = detail.get("distance")
+    activity.moving_time_seconds = detail.get("moving_time")
+    activity.elapsed_time_seconds = detail.get("elapsed_time")
+    activity.total_elevation_gain_m = detail.get("total_elevation_gain")
+    activity.elev_high_m = detail.get("elev_high")
+    activity.elev_low_m = detail.get("elev_low")
+    activity.average_speed_mps = detail.get("average_speed")
+    activity.max_speed_mps = detail.get("max_speed")
+    activity.average_grade_adjusted_speed_mps = average_gap
+    activity.gap_source = _gap_source(average_gap)
     activity.has_heartrate = _bool(detail.get("has_heartrate") or detail.get("average_heartrate"))
-    activity.average_heartrate = detail.get("average_heartrate")
-    activity.max_heartrate = detail.get("max_heartrate")
-    activity.average_cadence = detail.get("average_cadence")
+    activity.average_heartrate_bpm = detail.get("average_heartrate")
+    activity.max_heartrate_bpm = detail.get("max_heartrate")
+    activity.average_cadence_spm = _cadence_spm(detail.get("average_cadence"))
     activity.average_watts = detail.get("average_watts")
     activity.max_watts = detail.get("max_watts")
     activity.weighted_average_watts = detail.get("weighted_average_watts")
@@ -125,31 +160,21 @@ def _upsert_activity(
     activity.device_watts = detail.get("device_watts")
     activity.calories = detail.get("calories")
     activity.suffer_score = detail.get("suffer_score")
-    activity.gear_id = detail.get("gear_id")
     activity.trainer = detail.get("trainer")
     activity.commute = detail.get("commute")
     activity.manual = detail.get("manual")
     activity.private = detail.get("private")
     activity.flagged = detail.get("flagged")
     activity.hide_from_home = detail.get("hide_from_home")
-    activity.workout_type = detail.get("workout_type")
-    activity.achievement_count = detail.get("achievement_count")
-    activity.pr_count = detail.get("pr_count")
-    activity.kudos_count = detail.get("kudos_count")
-    activity.athlete_count = detail.get("athlete_count")
+    activity.gear_id = detail.get("gear_id")
     activity.device_name = detail.get("device_name")
-    activity.map_id = map_data.get("id")
-    activity.summary_polyline = map_data.get("summary_polyline")
-    activity.start_latlng = detail.get("start_latlng")
-    activity.end_latlng = detail.get("end_latlng")
-    activity.has_laps = metadata["has_laps"]
-    activity.has_splits = metadata["has_splits"]
-    activity.has_segments = metadata["has_segments"]
-    activity.has_best_efforts = metadata["has_best_efforts"]
-    activity.has_zones = metadata["has_zones"]
-    activity.has_streams = False
+    activity.has_laps = data_quality["has_laps"]
+    activity.has_splits = data_quality["has_splits"]
+    activity.has_best_efforts = data_quality["has_best_efforts"]
+    activity.has_zones = data_quality["has_activity_zones"]
+    activity.has_gap = average_gap is not None
+    activity.data_quality = data_quality
     activity.detail_data = detail
-    activity.ingestion_metadata = metadata
     activity.source_updated_at = _parse_dt(detail.get("updated_at"))
     activity.last_ingested_at = now
     activity.deleted_at = None
@@ -166,35 +191,37 @@ def _replace_child_rows(
     laps: list[dict[str, Any]],
     zones: list[dict[str, Any]] | None,
 ) -> None:
+    db.execute(delete(StravaActivityMetric).where(StravaActivityMetric.activity_id == activity_id))
     db.execute(delete(StravaActivityLap).where(StravaActivityLap.activity_id == activity_id))
-    db.execute(delete(StravaActivitySegmentEffort).where(StravaActivitySegmentEffort.activity_id == activity_id))
     db.execute(delete(StravaActivitySplit).where(StravaActivitySplit.activity_id == activity_id))
     db.execute(delete(StravaActivityBestEffort).where(StravaActivityBestEffort.activity_id == activity_id))
-    db.execute(delete(StravaActivityZone).where(StravaActivityZone.activity_id == activity_id))
+    db.execute(delete(StravaActivityZoneBucket).where(StravaActivityZoneBucket.activity_id == activity_id))
 
     now = _now()
     for index, lap in enumerate(laps):
-        lap_athlete = _athlete_id(lap, athlete_id)
+        average_gap = lap.get("average_grade_adjusted_speed")
         db.add(StravaActivityLap(
             lap_id=lap.get("id"),
             activity_id=activity_id,
-            athlete_id=lap_athlete,
+            athlete_id=_athlete_id(lap, athlete_id),
             lap_index=index,
             name=lap.get("name"),
             split=lap.get("split"),
             start_date=_parse_dt(lap.get("start_date")),
             start_date_local=_parse_dt(lap.get("start_date_local")),
-            distance=lap.get("distance"),
-            moving_time=lap.get("moving_time"),
-            elapsed_time=lap.get("elapsed_time"),
-            average_speed=lap.get("average_speed"),
-            max_speed=lap.get("max_speed"),
-            average_heartrate=lap.get("average_heartrate"),
-            max_heartrate=lap.get("max_heartrate"),
-            average_cadence=lap.get("average_cadence"),
+            distance_m=lap.get("distance"),
+            moving_time_seconds=lap.get("moving_time"),
+            elapsed_time_seconds=lap.get("elapsed_time"),
+            average_speed_mps=lap.get("average_speed"),
+            max_speed_mps=lap.get("max_speed"),
+            average_grade_adjusted_speed_mps=average_gap,
+            gap_source=_gap_source(average_gap),
+            average_heartrate_bpm=lap.get("average_heartrate"),
+            max_heartrate_bpm=lap.get("max_heartrate"),
+            average_cadence_spm=_cadence_spm(lap.get("average_cadence")),
             average_watts=lap.get("average_watts"),
             device_watts=lap.get("device_watts"),
-            total_elevation_gain=lap.get("total_elevation_gain"),
+            total_elevation_gain_m=lap.get("total_elevation_gain"),
             pace_zone=lap.get("pace_zone"),
             start_index=lap.get("start_index"),
             end_index=lap.get("end_index"),
@@ -203,46 +230,21 @@ def _replace_child_rows(
             updated_at=now,
         ))
 
-    for effort in detail.get("segment_efforts") or []:
-        segment = effort.get("segment") if isinstance(effort.get("segment"), dict) else {}
-        db.add(StravaActivitySegmentEffort(
-            segment_effort_id=effort.get("id"),
-            activity_id=activity_id,
-            name=effort.get("name"),
-            segment_id=segment.get("id"),
-            segment_name=segment.get("name"),
-            start_date=_parse_dt(effort.get("start_date")),
-            start_date_local=_parse_dt(effort.get("start_date_local")),
-            distance=effort.get("distance"),
-            moving_time=effort.get("moving_time"),
-            elapsed_time=effort.get("elapsed_time"),
-            start_index=effort.get("start_index"),
-            end_index=effort.get("end_index"),
-            average_heartrate=effort.get("average_heartrate"),
-            max_heartrate=effort.get("max_heartrate"),
-            average_cadence=effort.get("average_cadence"),
-            average_watts=effort.get("average_watts"),
-            device_watts=effort.get("device_watts"),
-            is_kom=effort.get("is_kom"),
-            kom_rank=effort.get("kom_rank"),
-            pr_rank=effort.get("pr_rank"),
-            hidden=effort.get("hidden"),
-            raw_data=effort,
-            created_at=now,
-            updated_at=now,
-        ))
-
     for source, rows in (("metric", detail.get("splits_metric") or []), ("standard", detail.get("splits_standard") or [])):
         for split in rows:
+            average_gap = split.get("average_grade_adjusted_speed")
             db.add(StravaActivitySplit(
                 activity_id=activity_id,
                 split_source=source,
                 split=split.get("split") or 0,
-                distance=split.get("distance"),
-                moving_time=split.get("moving_time"),
-                elapsed_time=split.get("elapsed_time"),
-                average_speed=split.get("average_speed"),
-                elevation_difference=split.get("elevation_difference"),
+                distance_m=split.get("distance"),
+                moving_time_seconds=split.get("moving_time"),
+                elapsed_time_seconds=split.get("elapsed_time"),
+                average_speed_mps=split.get("average_speed"),
+                average_grade_adjusted_speed_mps=average_gap,
+                gap_source=_gap_source(average_gap),
+                average_heartrate_bpm=split.get("average_heartrate"),
+                elevation_difference_m=split.get("elevation_difference"),
                 pace_zone=split.get("pace_zone"),
                 raw_data=split,
                 created_at=now,
@@ -254,9 +256,9 @@ def _replace_child_rows(
             best_effort_id=effort.get("id"),
             activity_id=activity_id,
             name=effort.get("name"),
-            distance=effort.get("distance"),
-            moving_time=effort.get("moving_time"),
-            elapsed_time=effort.get("elapsed_time"),
+            distance_m=effort.get("distance"),
+            moving_time_seconds=effort.get("moving_time"),
+            elapsed_time_seconds=effort.get("elapsed_time"),
             start_date=_parse_dt(effort.get("start_date")),
             start_date_local=_parse_dt(effort.get("start_date_local")),
             start_index=effort.get("start_index"),
@@ -267,16 +269,113 @@ def _replace_child_rows(
             updated_at=now,
         ))
 
-    for index, zone in enumerate(zones or []):
-        zone_type = zone.get("type") or zone.get("resource_state") or f"zone_{index}"
-        db.add(StravaActivityZone(
-            activity_id=activity_id,
-            zone_type=str(zone_type),
-            source="strava",
-            raw_data=zone,
-            created_at=now,
-            updated_at=now,
-        ))
+    for zone in zones or []:
+        zone_type = str(zone.get("type") or "unknown")
+        for index, bucket in enumerate(zone.get("distribution_buckets") or []):
+            db.add(StravaActivityZoneBucket(
+                activity_id=activity_id,
+                athlete_id=athlete_id,
+                zone_type=zone_type,
+                bucket_index=index + 1,
+                min_value=bucket.get("min"),
+                max_value=bucket.get("max"),
+                time_seconds=bucket.get("time"),
+                sensor_based=zone.get("sensor_based"),
+                custom_zones=zone.get("custom_zones"),
+                score=zone.get("score"),
+                source="strava",
+                raw_data=bucket,
+                created_at=now,
+                updated_at=now,
+            ))
+
+
+def _store_athlete_zones(db, athlete_id: int, athlete_zones: dict[str, Any] | None) -> bool:
+    if not athlete_zones:
+        return False
+
+    now = _now()
+    db.execute(delete(StravaAthleteZone).where(StravaAthleteZone.athlete_id == athlete_id))
+    created = False
+    for zone_type, zone_info in athlete_zones.items():
+        if not isinstance(zone_info, dict):
+            continue
+        for index, bucket in enumerate(zone_info.get("zones") or []):
+            db.add(StravaAthleteZone(
+                athlete_id=athlete_id,
+                zone_type=zone_type,
+                bucket_index=index + 1,
+                min_value=bucket.get("min"),
+                max_value=bucket.get("max"),
+                custom_zones=zone_info.get("custom_zones"),
+                source="strava",
+                effective_at=now,
+                fetched_at=now,
+                raw_data=bucket,
+                created_at=now,
+                updated_at=now,
+            ))
+            created = True
+    return created
+
+
+def _zone_seconds(db, activity_id: int) -> list[int]:
+    rows = db.scalars(
+        select(StravaActivityZoneBucket)
+        .where(StravaActivityZoneBucket.activity_id == activity_id)
+        .where(StravaActivityZoneBucket.zone_type == "heartrate")
+        .order_by(StravaActivityZoneBucket.bucket_index)
+        .limit(5)
+    ).all()
+    values = [row.time_seconds or 0 for row in rows]
+    return (values + [0, 0, 0, 0, 0])[:5]
+
+
+def _build_activity_metrics(db, activity: StravaActivity) -> None:
+    activity_id = activity.activity_id
+    zone_seconds = _zone_seconds(db, activity_id)
+    metric = StravaActivityMetric(
+        activity_id=activity_id,
+        distance_km=(activity.distance_m / 1000) if activity.distance_m is not None else None,
+        moving_time_seconds=activity.moving_time_seconds,
+        elapsed_time_seconds=activity.elapsed_time_seconds,
+        pace_seconds_per_km=_seconds_per_km(activity.distance_m, activity.moving_time_seconds),
+        gap_seconds_per_km=_mps_to_seconds_per_km(activity.average_grade_adjusted_speed_mps),
+        average_speed_kmh=_mps_to_kmh(activity.average_speed_mps),
+        average_grade_adjusted_speed_kmh=_mps_to_kmh(activity.average_grade_adjusted_speed_mps),
+        average_cadence_spm=activity.average_cadence_spm,
+        hr_zone_1_seconds=zone_seconds[0],
+        hr_zone_2_seconds=zone_seconds[1],
+        hr_zone_3_seconds=zone_seconds[2],
+        hr_zone_4_seconds=zone_seconds[3],
+        hr_zone_5_seconds=zone_seconds[4],
+        total_hr_zone_seconds=sum(zone_seconds),
+        easy_seconds=zone_seconds[0] + zone_seconds[1],
+        moderate_seconds=zone_seconds[2],
+        hard_seconds=zone_seconds[3] + zone_seconds[4],
+        lap_count=db.scalar(select(func.count(StravaActivityLap.id)).where(StravaActivityLap.activity_id == activity_id)) or 0,
+        split_count=db.scalar(select(func.count(StravaActivitySplit.id)).where(StravaActivitySplit.activity_id == activity_id)) or 0,
+        best_effort_count=db.scalar(select(func.count(StravaActivityBestEffort.id)).where(StravaActivityBestEffort.activity_id == activity_id)) or 0,
+        fastest_split_pace_seconds_per_km=None,
+        fastest_split_gap_seconds_per_km=None,
+        created_at=_now(),
+        updated_at=_now(),
+    )
+
+    splits = db.scalars(
+        select(StravaActivitySplit).where(StravaActivitySplit.activity_id == activity_id)
+    ).all()
+    paces = [
+        _seconds_per_km(split.distance_m, split.moving_time_seconds)
+        for split in splits
+    ]
+    gap_paces = [
+        _mps_to_seconds_per_km(split.average_grade_adjusted_speed_mps)
+        for split in splits
+    ]
+    metric.fastest_split_pace_seconds_per_km = min((value for value in paces if value), default=None)
+    metric.fastest_split_gap_seconds_per_km = min((value for value in gap_paces if value), default=None)
+    db.add(metric)
 
 
 def ingest_activity_event(
@@ -340,9 +439,20 @@ def ingest_activity_event(
                 log.info("Zone enrichment unavailable | activity=%s error=%s", activity_id, exc)
                 zones = None
 
+            try:
+                athlete_zones = strava.get_athlete_zones(db, user=user)
+            except Exception as exc:
+                log.info("Athlete zone snapshot unavailable | activity=%s error=%s", activity_id, exc)
+                athlete_zones = None
+
             activity = _upsert_activity(db, detail, owner_id, laps, zones)
             db.flush()
+            has_athlete_zones = _store_athlete_zones(db, activity.athlete_id, athlete_zones)
+            if has_athlete_zones:
+                activity.data_quality = {**activity.data_quality, "has_athlete_zones_snapshot": True}
             _replace_child_rows(db, activity_id, activity.athlete_id, detail, laps, zones)
+            db.flush()
+            _build_activity_metrics(db, activity)
 
             job.athlete_id = activity.athlete_id
             job.status = "succeeded"

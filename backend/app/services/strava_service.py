@@ -227,6 +227,18 @@ class StravaService:
         resp.raise_for_status()
         return resp.json()  # type: ignore[no-any-return]
 
+    def get_athlete_zones(self, db: Session, user: User) -> dict | None:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/athlete/zones",
+            headers=self._headers(user.access_token or ""),
+            timeout=30,
+        )
+        if resp.status_code in {401, 403, 404}:
+            return None
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
+
     def get_activity_streams(
         self,
         db: Session,
