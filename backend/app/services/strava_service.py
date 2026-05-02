@@ -344,6 +344,26 @@ class StravaService:
             page += 1
         return results
 
+    def get_athlete_profile(self, db: Session, user: User) -> dict:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/athlete",
+            headers=self._headers(user.access_token or ""),
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_athlete_stats(self, db: Session, user: User, athlete_id: int) -> dict:
+        user = self.ensure_fresh_token(db, user)
+        resp = httpx.get(
+            f"{STRAVA_BASE_URL}/api/v3/athletes/{athlete_id}/stats",
+            headers=self._headers(user.access_token or ""),
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def sync_gear_cache(self, db: Session, user: User) -> list[dict]:
         user = self.ensure_fresh_token(db, user)
         resp = httpx.get(

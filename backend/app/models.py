@@ -59,6 +59,15 @@ class Gear(Base):
     strava_gear_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    nickname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retired: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    notification_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    raw_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PendingActivity(Base):
@@ -372,4 +381,100 @@ class StravaBackfillRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+
+
+class AthleteProfile(Base):
+    __tablename__ = "athlete_profile"
+
+    athlete_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    firstname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    lastname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sex: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    premium: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summit: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ftp_watts: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    athlete_type: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    measurement_preference: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    strava_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    raw_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+
+
+class AthleteStats(Base):
+    __tablename__ = "athlete_stats"
+
+    athlete_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+
+    biggest_ride_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    biggest_climb_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    recent_ride_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_ride_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recent_ride_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_ride_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_ride_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recent_ride_achievement_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    recent_run_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_run_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recent_run_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_run_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_run_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recent_run_achievement_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    recent_swim_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_swim_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recent_swim_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_swim_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recent_swim_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recent_swim_achievement_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    all_ride_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_ride_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    all_ride_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_ride_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_ride_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    all_run_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_run_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    all_run_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_run_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_run_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    all_swim_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_swim_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    all_swim_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_swim_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    all_swim_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    ytd_ride_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_ride_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ytd_ride_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_ride_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_ride_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    ytd_run_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_run_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ytd_run_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_run_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_run_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    ytd_swim_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_swim_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ytd_swim_moving_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_swim_elapsed_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ytd_swim_elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    raw_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)

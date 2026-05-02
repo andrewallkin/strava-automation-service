@@ -16,6 +16,7 @@ from app.models import (
     StravaIngestionJob,
     User,
 )
+from app.services.strava_profile_service import sync_athlete_profile, sync_athlete_stats, sync_gear_detail
 from app.services.strava_service import StravaService
 
 log = logging.getLogger("ingestion")
@@ -453,6 +454,23 @@ def ingest_activity_event(
             _replace_child_rows(db, activity_id, activity.athlete_id, detail, laps, zones)
             db.flush()
             _build_activity_metrics(db, activity)
+
+            try:
+                sync_athlete_profile(db, user, strava)
+            except Exception as exc:
+                log.warning("Athlete profile sync failed | activity=%s error=%s", activity_id, exc)
+
+            try:
+                sync_athlete_stats(db, user, strava)
+            except Exception as exc:
+                log.warning("Athlete stats sync failed | activity=%s error=%s", activity_id, exc)
+
+            gear_id = detail.get("gear_id")
+            if gear_id:
+                try:
+                    sync_gear_detail(db, user, gear_id, strava)
+                except Exception as exc:
+                    log.warning("Gear detail sync failed | activity=%s gear_id=%s error=%s", activity_id, gear_id, exc)
 
             job.athlete_id = activity.athlete_id
             job.status = "succeeded"
