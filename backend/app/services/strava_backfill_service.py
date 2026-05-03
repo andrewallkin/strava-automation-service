@@ -38,6 +38,7 @@ def _refresh_counters(db, run: StravaBackfillRun) -> None:
     run.succeeded_count = sum(1 for job in jobs if job.status == "succeeded")
     run.failed_count = sum(1 for job in jobs if job.status == "failed")
     run.skipped_count = sum(1 for job in jobs if job.status == "skipped")
+    run.queued_count = sum(1 for job in jobs if job.status in ("queued", "running"))
     run.updated_at = _now()
 
 
@@ -125,13 +126,14 @@ def process_backfill_run(backfill_run_id: int) -> None:
                     status="queued",
                     backfill_run_id=run.id,
                 ))
-            run.queued_count = len(selected_ids)
             run.status = "queued" if selected_ids else "completed"
             run.rate_limit_wait_until = None
             run.rate_limit_wait_reason = None
             if not selected_ids:
                 run.completed_at = _now()
             run.updated_at = _now()
+            db.flush()
+            _refresh_counters(db, run)
             db.commit()
 
             if not selected_ids:
@@ -179,6 +181,7 @@ def process_backfill_run(backfill_run_id: int) -> None:
             db.rollback()
             run = db.get(StravaBackfillRun, backfill_run_id)
             if run:
+                _refresh_counters(db, run)
                 run.status = "failed"
                 run.last_error = str(exc)
                 run.rate_limit_wait_until = None

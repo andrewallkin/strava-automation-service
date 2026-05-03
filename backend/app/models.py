@@ -373,6 +373,7 @@ class StravaBackfillRun(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     requested_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     missing_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Jobs still queued or running (updated as ingestion progresses; not a historical snapshot).
     queued_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     succeeded_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

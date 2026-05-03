@@ -7,6 +7,7 @@ import {
   cleanupIngestedActivities,
   createBackfill,
   fetchBackfill,
+  fetchBackfillHistory,
   fetchBackfillJobs,
   fetchIngestedActivities,
   fetchLatestBackfill,
@@ -25,6 +26,10 @@ function formatDate(value: string | null): string {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+function formatDateOnly(value: string): string {
+  return value;
 }
 
 function formatDistance(value: number | null): string {
@@ -47,6 +52,12 @@ function formatRateLimitWait(run: BackfillRun): string | null {
   const seconds = Math.max(0, Math.ceil((waitUntil.getTime() - Date.now()) / 1000));
   const minutes = Math.ceil(seconds / 60);
   return `Waiting for Strava ${run.rate_limit_wait_reason ?? "rate limit"} reset at ${formatDate(run.rate_limit_wait_until)} (${minutes} min).`;
+}
+
+function backfillProgress(run: BackfillRun): string {
+  const total = run.missing_count || 0;
+  const done = run.succeeded_count + run.failed_count + run.skipped_count;
+  return total ? `${done}/${total}` : "-";
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -97,6 +108,7 @@ export function IngestionPage() {
   const [page, setPage] = useState(1);
   const [run, setRun] = useState<BackfillRun | null>(null);
   const [jobs, setJobs] = useState<BackfillJob[]>([]);
+  const [pastRuns, setPastRuns] = useState<BackfillRun[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [forceRefresh, setForceRefresh] = useState(false);
@@ -107,10 +119,18 @@ export function IngestionPage() {
     setActivities(await fetchIngestedActivities(page));
   }, [page]);
 
+  const loadBackfillHistory = useCallback(async () => {
+    setPastRuns(await fetchBackfillHistory());
+  }, []);
+
   const loadRun = useCallback(async (id: number) => {
     const nextRun = await fetchBackfill(id);
     setRun(nextRun);
     setJobs(await fetchBackfillJobs(id));
+    setPastRuns((runs) => {
+      const withoutCurrent = runs.filter((item) => item.id !== nextRun.id);
+      return [nextRun, ...withoutCurrent].slice(0, 10);
+    });
     if (!activeStatuses.has(nextRun.status)) {
       await loadActivities();
     }
@@ -121,11 +141,10 @@ export function IngestionPage() {
   }, [loadActivities]);
 
   useEffect(() => {
-    fetchLatestBackfill()
-      .then((latestRun) => {
-        if (latestRun) {
-          return loadRun(latestRun.id);
-        }
+    Promise.all([fetchLatestBackfill(), fetchBackfillHistory()])
+      .then(([latestRun, history]) => {
+        setPastRuns(history);
+        if (latestRun) return loadRun(latestRun.id);
       })
       .catch(() => setMessage("Could not load latest backfill status."));
   }, [loadRun]);
@@ -153,6 +172,7 @@ export function IngestionPage() {
       setRun(nextRun);
       setJobs([]);
       await loadRun(nextRun.id);
+      await loadBackfillHistory();
     } catch {
       setMessage("Could not start backfill. Check the date range and Strava connection.");
     }
@@ -162,12 +182,14 @@ export function IngestionPage() {
     if (!run) return;
     await retryFailedBackfill(run.id);
     await loadRun(run.id);
+    await loadBackfillHistory();
   };
 
   const handleCancel = async () => {
     if (!run) return;
     await cancelBackfill(run.id);
     await loadRun(run.id);
+    await loadBackfillHistory();
   };
 
   const handleCleanup = async () => {
@@ -176,6 +198,7 @@ export function IngestionPage() {
     setCleanupText("");
     setRun(null);
     setJobs([]);
+    setPastRuns([]);
     await loadActivities();
     setMessage("Ingestion tables cleaned up.");
   };
@@ -360,6 +383,60 @@ export function IngestionPage() {
             </div>
           )}
         </div>
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Past Backfills</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Recent ingestion runs, including active rate-limited runs</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadBackfillHistory().catch(() => setMessage("Could not refresh backfill history."))}
+            className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
+          >
+            Refresh
+          </button>
+        </div>
+        {pastRuns.length === 0 ? (
+          <p className="px-5 py-4 text-sm text-gray-500">No backfills have been run yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="px-5 py-2 text-left font-medium text-gray-500 uppercase tracking-wide">Run</th>
+                  <th className="px-5 py-2 text-left font-medium text-gray-500 uppercase tracking-wide">Range</th>
+                  <th className="px-5 py-2 text-left font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="px-5 py-2 text-left font-medium text-gray-500 uppercase tracking-wide">Progress</th>
+                  <th className="px-5 py-2 text-left font-medium text-gray-500 uppercase tracking-wide">Updated</th>
+                  <th className="px-5 py-2 text-left font-medium text-gray-500 uppercase tracking-wide">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {pastRuns.map((pastRun) => (
+                  <tr key={pastRun.id} className="hover:bg-gray-50 text-gray-600">
+                    <td className="px-5 py-2 whitespace-nowrap font-medium text-gray-900">#{pastRun.id}</td>
+                    <td className="px-5 py-2 whitespace-nowrap">{formatDateOnly(pastRun.start_date)} to {formatDateOnly(pastRun.end_date)}</td>
+                    <td className="px-5 py-2 whitespace-nowrap"><StatusBadge status={pastRun.status} /></td>
+                    <td className="px-5 py-2 whitespace-nowrap">{backfillProgress(pastRun)}</td>
+                    <td className="px-5 py-2 whitespace-nowrap">{formatDate(pastRun.updated_at)}</td>
+                    <td className="px-5 py-2 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => loadRun(pastRun.id).catch(() => setMessage("Could not load selected backfill."))}
+                        className="px-2.5 py-1 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="bg-white rounded-xl shadow-sm border border-red-200">

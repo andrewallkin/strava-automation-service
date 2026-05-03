@@ -290,6 +290,11 @@ export async function fetchLatestBackfill(): Promise<BackfillRun | null> {
   return getJson<BackfillRun | null>("/ui/backfill/latest");
 }
 
+export async function fetchBackfillHistory(limit = 10): Promise<BackfillRun[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return getJson<BackfillRun[]>(`/ui/backfill/history?${params}`);
+}
+
 export async function fetchBackfillJobs(id: number): Promise<BackfillJob[]> {
   return getJson<BackfillJob[]>(`/ui/backfill/${id}/jobs`);
 }

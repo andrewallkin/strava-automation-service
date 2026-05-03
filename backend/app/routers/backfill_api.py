@@ -191,6 +191,21 @@ def get_latest_backfill(
     return _backfill_row(latest_run) if latest_run else None
 
 
+@router.get("/backfill/history")
+def get_backfill_history(
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> list[dict]:
+    rows = db.scalars(
+        select(StravaBackfillRun)
+        .where(StravaBackfillRun.user_id == user.id)
+        .order_by(StravaBackfillRun.updated_at.desc())
+        .limit(limit)
+    ).all()
+    return [_backfill_row(row) for row in rows]
+
+
 @router.get("/backfill/{backfill_run_id}")
 def get_backfill(
     backfill_run_id: int,
