@@ -166,6 +166,31 @@ def create_backfill(
     return _backfill_row(run)
 
 
+@router.get("/backfill/latest")
+def get_latest_backfill(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict | None:
+    active_statuses = {"created", "discovering", "queued", "running", "rate_limited"}
+    active_run = db.scalars(
+        select(StravaBackfillRun)
+        .where(StravaBackfillRun.user_id == user.id)
+        .where(StravaBackfillRun.status.in_(active_statuses))
+        .order_by(StravaBackfillRun.updated_at.desc())
+        .limit(1)
+    ).first()
+    if active_run:
+        return _backfill_row(active_run)
+
+    latest_run = db.scalars(
+        select(StravaBackfillRun)
+        .where(StravaBackfillRun.user_id == user.id)
+        .order_by(StravaBackfillRun.updated_at.desc())
+        .limit(1)
+    ).first()
+    return _backfill_row(latest_run) if latest_run else None
+
+
 @router.get("/backfill/{backfill_run_id}")
 def get_backfill(
     backfill_run_id: int,

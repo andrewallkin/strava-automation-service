@@ -9,6 +9,7 @@ import {
   fetchBackfill,
   fetchBackfillJobs,
   fetchIngestedActivities,
+  fetchLatestBackfill,
   retryFailedBackfill,
 } from "../lib/api";
 
@@ -118,6 +119,16 @@ export function IngestionPage() {
   useEffect(() => {
     loadActivities().catch(() => setMessage("Could not load ingested activities."));
   }, [loadActivities]);
+
+  useEffect(() => {
+    fetchLatestBackfill()
+      .then((latestRun) => {
+        if (latestRun) {
+          return loadRun(latestRun.id);
+        }
+      })
+      .catch(() => setMessage("Could not load latest backfill status."));
+  }, [loadRun]);
 
   useEffect(() => {
     if (!run || !activeStatuses.has(run.status)) return;

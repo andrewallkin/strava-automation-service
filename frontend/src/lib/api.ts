@@ -286,6 +286,10 @@ export async function fetchBackfill(id: number): Promise<BackfillRun> {
   return getJson<BackfillRun>(`/ui/backfill/${id}`);
 }
 
+export async function fetchLatestBackfill(): Promise<BackfillRun | null> {
+  return getJson<BackfillRun | null>("/ui/backfill/latest");
+}
+
 export async function fetchBackfillJobs(id: number): Promise<BackfillJob[]> {
   return getJson<BackfillJob[]>(`/ui/backfill/${id}/jobs`);
 }
