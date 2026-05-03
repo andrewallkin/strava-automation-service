@@ -13,24 +13,9 @@ import {
   fetchLatestBackfill,
   retryFailedBackfill,
 } from "../lib/api";
+import { formatStravaLocalDateTime, formatUserDateOnly, formatUserDateTime } from "../lib/datetimeDisplay";
 
 const activeStatuses = new Set(["created", "discovering", "queued", "running", "rate_limited"]);
-
-function formatDate(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("en-ZA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
-
-function formatDateOnly(value: string): string {
-  return value;
-}
 
 function formatDistance(value: number | null): string {
   if (!value) return "-";
@@ -51,13 +36,25 @@ function formatRateLimitWait(run: BackfillRun): string | null {
   const waitUntil = new Date(run.rate_limit_wait_until);
   const seconds = Math.max(0, Math.ceil((waitUntil.getTime() - Date.now()) / 1000));
   const minutes = Math.ceil(seconds / 60);
-  return `Waiting for Strava ${run.rate_limit_wait_reason ?? "rate limit"} reset at ${formatDate(run.rate_limit_wait_until)} (${minutes} min).`;
+  return `Waiting for Strava ${run.rate_limit_wait_reason ?? "rate limit"} reset at ${formatUserDateTime(run.rate_limit_wait_until)} (${minutes} min).`;
 }
 
 function backfillProgress(run: BackfillRun): string {
   const total = run.missing_count || 0;
   const done = run.succeeded_count + run.failed_count + run.skipped_count;
   return total ? `${done}/${total}` : "-";
+}
+
+/** Latest activity first: UI "Updated" column order, stable when viewing a row. */
+function comparePastRunsDesc(a: BackfillRun, b: BackfillRun): number {
+  const t = (r: BackfillRun) => r.updated_at ?? r.created_at ?? "";
+  const cmp = t(b).localeCompare(t(a));
+  if (cmp !== 0) return cmp;
+  return b.id - a.id;
+}
+
+function sortPastRunsDesc(runs: BackfillRun[]): BackfillRun[] {
+  return [...runs].sort(comparePastRunsDesc);
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -120,7 +117,7 @@ export function IngestionPage() {
   }, [page]);
 
   const loadBackfillHistory = useCallback(async () => {
-    setPastRuns(await fetchBackfillHistory());
+    setPastRuns(sortPastRunsDesc(await fetchBackfillHistory()));
   }, []);
 
   const loadRun = useCallback(async (id: number) => {
@@ -129,7 +126,7 @@ export function IngestionPage() {
     setJobs(await fetchBackfillJobs(id));
     setPastRuns((runs) => {
       const withoutCurrent = runs.filter((item) => item.id !== nextRun.id);
-      return [nextRun, ...withoutCurrent].slice(0, 10);
+      return sortPastRunsDesc([...withoutCurrent, nextRun]).slice(0, 10);
     });
     if (!activeStatuses.has(nextRun.status)) {
       await loadActivities();
@@ -143,7 +140,7 @@ export function IngestionPage() {
   useEffect(() => {
     Promise.all([fetchLatestBackfill(), fetchBackfillHistory()])
       .then(([latestRun, history]) => {
-        setPastRuns(history);
+        setPastRuns(sortPastRunsDesc(history));
         if (latestRun) return loadRun(latestRun.id);
       })
       .catch(() => setMessage("Could not load latest backfill status."));
@@ -254,7 +251,7 @@ export function IngestionPage() {
                         <div className="font-medium text-gray-900">{activity.name ?? "Untitled activity"}</div>
                         <div className="text-gray-400">{activity.activity_id}</div>
                       </td>
-                      <td className="px-5 py-2 whitespace-nowrap">{formatDate(activity.start_date_local)}</td>
+                      <td className="px-5 py-2 whitespace-nowrap">{formatStravaLocalDateTime(activity.start_date_local)}</td>
                       <td className="px-5 py-2 whitespace-nowrap">{activity.sport_type ?? activity.activity_type ?? "-"}</td>
                       <td className="px-5 py-2 whitespace-nowrap">{formatDistance(activity.distance)}</td>
                       <td className="px-5 py-2 whitespace-nowrap">{formatDuration(activity.moving_time)}</td>
@@ -418,10 +415,10 @@ export function IngestionPage() {
                 {pastRuns.map((pastRun) => (
                   <tr key={pastRun.id} className="hover:bg-gray-50 text-gray-600">
                     <td className="px-5 py-2 whitespace-nowrap font-medium text-gray-900">#{pastRun.id}</td>
-                    <td className="px-5 py-2 whitespace-nowrap">{formatDateOnly(pastRun.start_date)} to {formatDateOnly(pastRun.end_date)}</td>
+                    <td className="px-5 py-2 whitespace-nowrap">{formatUserDateOnly(pastRun.start_date)} to {formatUserDateOnly(pastRun.end_date)}</td>
                     <td className="px-5 py-2 whitespace-nowrap"><StatusBadge status={pastRun.status} /></td>
                     <td className="px-5 py-2 whitespace-nowrap">{backfillProgress(pastRun)}</td>
-                    <td className="px-5 py-2 whitespace-nowrap">{formatDate(pastRun.updated_at)}</td>
+                    <td className="px-5 py-2 whitespace-nowrap">{formatUserDateTime(pastRun.updated_at)}</td>
                     <td className="px-5 py-2 whitespace-nowrap">
                       <button
                         type="button"

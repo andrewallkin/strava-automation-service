@@ -8,6 +8,7 @@ import {
   revokeMcpApiKey,
   updateSettings
 } from "../lib/api";
+import { formatUserDateTime } from "../lib/datetimeDisplay";
 
 /** Clipboard API can fail silently over HTTP or without permission; fall back to execCommand. */
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -296,11 +297,11 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
                     <div className="grid gap-1 text-xs text-gray-600 sm:grid-cols-2 sm:gap-x-4">
                       <p>
                         <span className="text-gray-500">Created</span>{" "}
-                        {key.created_at ? new Date(key.created_at).toLocaleString() : "—"}
+                        {key.created_at ? formatUserDateTime(key.created_at, true) : "—"}
                       </p>
                       <p>
                         <span className="text-gray-500">Last used</span>{" "}
-                        {key.last_used_at ? new Date(key.last_used_at).toLocaleString() : "Never used"}
+                        {key.last_used_at ? formatUserDateTime(key.last_used_at, true) : "Never used"}
                       </p>
                     </div>
                   </div>

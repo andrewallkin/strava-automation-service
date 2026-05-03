@@ -19,27 +19,7 @@ import {
   retryActivity
 } from "../lib/api";
 import { formatMovingTime } from "../lib/formatMovingTime";
-
-const DATE_OPTS: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false
-};
-
-function formatDate(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("en-ZA", DATE_OPTS);
-}
-
-/** Strava start_date_local is local time but API incorrectly adds Z. Strip Z so JS parses as local. */
-function formatLocalDate(value: string | null): string {
-  if (!value) return "-";
-  const localStr = value.replace(/Z$/i, "");
-  return new Date(localStr).toLocaleString("en-ZA", DATE_OPTS);
-}
+import { formatStravaLocalDateTime, formatUserDateTime } from "../lib/datetimeDisplay";
 
 function formatEventType(eventType: string): string {
   return eventType
@@ -92,7 +72,7 @@ function ActivityCard({ activity }: { activity: StravaActivity }) {
             {activity.name ?? (isRun ? "Run" : "Workout")}
           </p>
           <p className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
-            {activity.start_date_local ? formatLocalDate(activity.start_date_local) : ""}
+            {activity.start_date_local ? formatStravaLocalDateTime(activity.start_date_local) : ""}
           </p>
         </div>
         {isRun && (distanceKm || duration) && (
@@ -215,7 +195,7 @@ export function StatsGrid({ summary }: { summary: Summary | null }) {
       >
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last automation</p>
         <p className="mt-1 text-xs font-semibold text-gray-900 leading-tight">
-          {formatDate(summary?.last_event_at ?? null)}
+          {formatUserDateTime(summary?.last_event_at ?? null)}
         </p>
       </div>
     </div>
@@ -242,7 +222,7 @@ export function PendingActivities({
             <div key={item.activity_id} className="px-5 py-3 flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-900">Activity #{item.activity_id}</p>
-                <p className="text-xs text-gray-500">{formatDate(item.created_at)}</p>
+                <p className="text-xs text-gray-500">{formatUserDateTime(item.created_at)}</p>
               </div>
               <button
                 type="button"
@@ -290,7 +270,7 @@ export function RecentEvents({ events }: { events: EventRow[] }) {
             <tbody className="divide-y divide-gray-50">
               {events.map((event) => (
                 <tr key={event.id} className="hover:bg-gray-50 text-gray-600">
-                  <td className="px-5 py-2 whitespace-nowrap">{formatDate(event.created_at)}</td>
+                  <td className="px-5 py-2 whitespace-nowrap">{formatUserDateTime(event.created_at)}</td>
                   <td className="px-5 py-2 whitespace-nowrap">{formatEventType(event.event_type)}</td>
                   <td className="px-5 py-2"><StatusBadge status={event.status} /></td>
                   <td className="px-5 py-2">{event.message}</td>
