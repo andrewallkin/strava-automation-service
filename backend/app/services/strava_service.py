@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -14,8 +15,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import User
+from app.models import Gear, User
 from app.services.activity_service import upsert_gear
+
+log = logging.getLogger("strava")
 
 STRAVA_BASE_URL = "https://www.strava.com"
 STRAVA_API_PREFIX = "/api/v3"
@@ -589,4 +592,16 @@ class StravaService:
                 name=shoe.get("name", shoe["id"]),
                 is_default=idx == 0,
             )
+        # upsert_gear does not populate distance/details; ingestion only syncs gear when an activity
+        # carries gear_id. Fill missing rows here so MCP / DB reports match Strava shoe totals.
+        from app.services.strava_profile_service import sync_gear_detail
+
+        for shoe in shoes:
+            gear_id = shoe["id"]
+            row = db.scalar(select(Gear).where(Gear.strava_gear_id == gear_id))
+            if row is not None and row.fetched_at is None:
+                try:
+                    sync_gear_detail(db, user, gear_id, self)
+                except Exception as exc:
+                    log.warning("Gear detail sync failed | gear_id=%s error=%s", gear_id, exc)
         return shoes
