@@ -378,6 +378,8 @@ class StravaBackfillRun(Base):
     failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     skipped_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rate_limit_wait_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rate_limit_wait_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

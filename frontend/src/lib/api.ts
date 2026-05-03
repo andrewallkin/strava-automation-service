@@ -95,6 +95,8 @@ export type BackfillRun = {
   failed_count: number;
   skipped_count: number;
   last_error: string | null;
+  rate_limit_wait_until: string | null;
+  rate_limit_wait_reason: string | null;
   created_at: string | null;
   started_at: string | null;
   completed_at: string | null;

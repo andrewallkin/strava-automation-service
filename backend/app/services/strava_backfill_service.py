@@ -18,7 +18,7 @@ from app.models import (
     User,
 )
 from app.services.strava_ingestion_service import ingest_activity_event
-from app.services.strava_service import StravaService
+from app.services.strava_service import StravaRateLimitWait, StravaService, strava_rate_limit_wait_handler
 
 log = logging.getLogger("ingestion")
 
@@ -39,6 +39,33 @@ def _refresh_counters(db, run: StravaBackfillRun) -> None:
     run.failed_count = sum(1 for job in jobs if job.status == "failed")
     run.skipped_count = sum(1 for job in jobs if job.status == "skipped")
     run.updated_at = _now()
+
+
+def _rate_limit_wait_handler(backfill_run_id: int):
+    previous_status: str | None = None
+
+    def handle(wait: StravaRateLimitWait | None) -> None:
+        nonlocal previous_status
+        with SessionLocal() as db:
+            run = db.get(StravaBackfillRun, backfill_run_id)
+            if not run or run.status in {"completed", "completed_with_errors", "failed", "cancelled"}:
+                return
+            if wait:
+                if run.status != "rate_limited":
+                    previous_status = run.status
+                run.status = "rate_limited"
+                run.rate_limit_wait_until = wait.wait_until
+                run.rate_limit_wait_reason = wait.reason
+            else:
+                if run.status == "rate_limited":
+                    run.status = previous_status or "running"
+                run.rate_limit_wait_until = None
+                run.rate_limit_wait_reason = None
+                previous_status = None
+            run.updated_at = _now()
+            db.commit()
+
+    return handle
 
 
 def _select_backfill_ids(db, discovered: list[dict], force_refresh: bool) -> list[int]:
@@ -70,18 +97,21 @@ def process_backfill_run(backfill_run_id: int) -> None:
 
         try:
             run.status = "discovering"
+            run.rate_limit_wait_until = None
+            run.rate_limit_wait_reason = None
             run.started_at = run.started_at or _now()
             run.updated_at = _now()
             db.commit()
 
             after_epoch = _date_epoch(run.start_date)
             before_epoch = _date_epoch(date.fromordinal(run.end_date.toordinal() + 1))
-            discovered = strava.get_athlete_activities_between(
-                db,
-                user,
-                after_epoch=after_epoch,
-                before_epoch=before_epoch,
-            )
+            with strava_rate_limit_wait_handler(_rate_limit_wait_handler(run.id)):
+                discovered = strava.get_athlete_activities_between(
+                    db,
+                    user,
+                    after_epoch=after_epoch,
+                    before_epoch=before_epoch,
+                )
             selected_ids = _select_backfill_ids(db, discovered, run.force_refresh)
             run.requested_count = len(discovered)
             run.missing_count = len(selected_ids)
@@ -97,6 +127,8 @@ def process_backfill_run(backfill_run_id: int) -> None:
                 ))
             run.queued_count = len(selected_ids)
             run.status = "queued" if selected_ids else "completed"
+            run.rate_limit_wait_until = None
+            run.rate_limit_wait_reason = None
             if not selected_ids:
                 run.completed_at = _now()
             run.updated_at = _now()
@@ -106,6 +138,8 @@ def process_backfill_run(backfill_run_id: int) -> None:
                 return
 
             run.status = "running"
+            run.rate_limit_wait_until = None
+            run.rate_limit_wait_reason = None
             run.updated_at = _now()
             db.commit()
 
@@ -117,14 +151,15 @@ def process_backfill_run(backfill_run_id: int) -> None:
             ).all()
             for index, job in enumerate(jobs):
                 db.commit()
-                ingest_activity_event(
-                    activity_id=job.activity_id,
-                    owner_id=run.athlete_id,
-                    aspect_type="create",
-                    trigger_type="backfill",
-                    job_id=job.id,
-                    backfill_run_id=run.id,
-                )
+                with strava_rate_limit_wait_handler(_rate_limit_wait_handler(run.id)):
+                    ingest_activity_event(
+                        activity_id=job.activity_id,
+                        owner_id=run.athlete_id,
+                        aspect_type="create",
+                        trigger_type="backfill",
+                        job_id=job.id,
+                        backfill_run_id=run.id,
+                    )
                 db.expire_all()
                 db.refresh(run)
                 _refresh_counters(db, run)
@@ -135,6 +170,8 @@ def process_backfill_run(backfill_run_id: int) -> None:
             db.refresh(run)
             _refresh_counters(db, run)
             run.status = "completed_with_errors" if run.failed_count else "completed"
+            run.rate_limit_wait_until = None
+            run.rate_limit_wait_reason = None
             run.completed_at = _now()
             run.updated_at = _now()
             db.commit()
@@ -144,6 +181,8 @@ def process_backfill_run(backfill_run_id: int) -> None:
             if run:
                 run.status = "failed"
                 run.last_error = str(exc)
+                run.rate_limit_wait_until = None
+                run.rate_limit_wait_reason = None
                 run.completed_at = _now()
                 run.updated_at = _now()
                 db.commit()
@@ -162,6 +201,8 @@ def retry_failed_backfill_jobs(backfill_run_id: int) -> None:
             .order_by(StravaIngestionJob.queued_at)
         ).all()
         run.status = "running"
+        run.rate_limit_wait_until = None
+        run.rate_limit_wait_reason = None
         run.completed_at = None
         run.updated_at = _now()
         db.commit()
@@ -172,14 +213,15 @@ def retry_failed_backfill_jobs(backfill_run_id: int) -> None:
             job.completed_at = None
             job.updated_at = _now()
             db.commit()
-            ingest_activity_event(
-                activity_id=job.activity_id,
-                owner_id=run.athlete_id,
-                aspect_type=job.aspect_type,
-                trigger_type="manual_retry",
-                job_id=job.id,
-                backfill_run_id=run.id,
-            )
+            with strava_rate_limit_wait_handler(_rate_limit_wait_handler(run.id)):
+                ingest_activity_event(
+                    activity_id=job.activity_id,
+                    owner_id=run.athlete_id,
+                    aspect_type=job.aspect_type,
+                    trigger_type="manual_retry",
+                    job_id=job.id,
+                    backfill_run_id=run.id,
+                )
             db.expire_all()
             db.refresh(run)
             _refresh_counters(db, run)
@@ -190,6 +232,8 @@ def retry_failed_backfill_jobs(backfill_run_id: int) -> None:
         db.refresh(run)
         _refresh_counters(db, run)
         run.status = "completed_with_errors" if run.failed_count else "completed"
+        run.rate_limit_wait_until = None
+        run.rate_limit_wait_reason = None
         run.completed_at = _now()
         run.updated_at = _now()
         db.commit()
@@ -210,6 +254,8 @@ def cancel_backfill_run(backfill_run_id: int) -> bool:
             job.last_error = "Backfill cancelled"
             job.updated_at = _now()
         run.status = "cancelled"
+        run.rate_limit_wait_until = None
+        run.rate_limit_wait_reason = None
         run.completed_at = _now()
         run.updated_at = _now()
         _refresh_counters(db, run)

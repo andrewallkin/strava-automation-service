@@ -12,7 +12,7 @@ import {
   retryFailedBackfill,
 } from "../lib/api";
 
-const activeStatuses = new Set(["created", "discovering", "queued", "running"]);
+const activeStatuses = new Set(["created", "discovering", "queued", "running", "rate_limited"]);
 
 function formatDate(value: string | null): string {
   if (!value) return "-";
@@ -39,12 +39,22 @@ function formatDuration(value: number | null): string {
   return `${minutes}m`;
 }
 
+function formatRateLimitWait(run: BackfillRun): string | null {
+  if (run.status !== "rate_limited") return null;
+  if (!run.rate_limit_wait_until) return "Waiting for Strava rate limit reset.";
+  const waitUntil = new Date(run.rate_limit_wait_until);
+  const seconds = Math.max(0, Math.ceil((waitUntil.getTime() - Date.now()) / 1000));
+  const minutes = Math.ceil(seconds / 60);
+  return `Waiting for Strava ${run.rate_limit_wait_reason ?? "rate limit"} reset at ${formatDate(run.rate_limit_wait_until)} (${minutes} min).`;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const classes: Record<string, string> = {
     completed: "bg-green-100 text-green-700",
     succeeded: "bg-green-100 text-green-700",
     completed_with_errors: "bg-yellow-100 text-yellow-700",
     running: "bg-blue-100 text-blue-700",
+    rate_limited: "bg-orange-100 text-orange-700",
     queued: "bg-gray-100 text-gray-700",
     discovering: "bg-blue-100 text-blue-700",
     failed: "bg-red-100 text-red-700",
@@ -118,6 +128,7 @@ export function IngestionPage() {
   }, [loadRun, run]);
 
   const failedJobs = useMemo(() => jobs.filter((job) => job.status === "failed"), [jobs]);
+  const rateLimitWaitMessage = run ? formatRateLimitWait(run) : null;
 
   const handleBackfill = async (event: FormEvent) => {
     event.preventDefault();
@@ -309,6 +320,11 @@ export function IngestionPage() {
                 <div className="rounded-lg bg-green-50 p-3"><div className="font-semibold">{run.succeeded_count}</div><div className="text-xs text-gray-500">Done</div></div>
                 <div className="rounded-lg bg-red-50 p-3"><div className="font-semibold">{run.failed_count}</div><div className="text-xs text-gray-500">Failed</div></div>
               </div>
+              {rateLimitWaitMessage && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                  {rateLimitWaitMessage}
+                </div>
+              )}
               {run.last_error && <p className="text-sm text-red-600">{run.last_error}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={() => loadRun(run.id)} className="px-3 py-1.5 rounded-md border border-gray-300 text-sm">Refresh</button>

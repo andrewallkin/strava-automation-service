@@ -72,6 +72,8 @@ def _backfill_row(row: StravaBackfillRun) -> dict:
         "failed_count": row.failed_count,
         "skipped_count": row.skipped_count,
         "last_error": row.last_error,
+        "rate_limit_wait_until": _dt(row.rate_limit_wait_until),
+        "rate_limit_wait_reason": row.rate_limit_wait_reason,
         "created_at": _dt(row.created_at),
         "started_at": _dt(row.started_at),
         "completed_at": _dt(row.completed_at),
