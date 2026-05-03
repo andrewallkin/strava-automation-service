@@ -320,6 +320,54 @@ def _store_athlete_zones(db, athlete_id: int, athlete_zones: dict[str, Any] | No
     return created
 
 
+def prefetch_static_athlete_for_ingestion(db, user: User, strava: StravaService, athlete_id: int) -> tuple[bool, bool]:
+    """Fetch athlete profile, stats, and zone snapshot once (e.g. before a backfill batch).
+
+    Returns (batch_success, had_athlete_zones_snapshot). On any failure rolls back this
+    prefetch work and returns (False, False) so callers fall back to per-activity requests.
+    """
+    try:
+        sync_athlete_profile(db, user, strava)
+        sync_athlete_stats(db, user, strava)
+        try:
+            athlete_zones = strava.get_athlete_zones(db, user=user)
+        except Exception as exc:
+            log.info("Athlete zone snapshot unavailable (prefetch) | athlete_id=%s error=%s", athlete_id, exc)
+            athlete_zones = None
+        had_snap = _store_athlete_zones(db, athlete_id, athlete_zones)
+        db.commit()
+        return True, had_snap
+    except Exception as exc:
+        db.rollback()
+        log.warning(
+            "Static athlete prefetch failed; falling back per-activity Strava calls | athlete_id=%s error=%s",
+            athlete_id, exc,
+        )
+        return False, False
+
+
+def sync_gear_detail_for_activity_ids(
+    db, user: User, strava: StravaService, activity_ids: list[int],
+) -> None:
+    """One ``get_gear_detail`` per distinct non-null gear on the given activities."""
+    if not activity_ids:
+        return
+    gear_rows = db.scalars(
+        select(StravaActivity.gear_id)
+        .where(StravaActivity.activity_id.in_(activity_ids))
+        .where(StravaActivity.gear_id.isnot(None))
+        .distinct()
+    ).all()
+    for gear_id in gear_rows:
+        if not gear_id:
+            continue
+        try:
+            sync_gear_detail(db, user, gear_id, strava)
+        except Exception as exc:
+            log.warning("Gear detail sync failed (batch) | gear_id=%s error=%s", gear_id, exc)
+    db.commit()
+
+
 def _zone_seconds(db, activity_id: int) -> list[int]:
     rows = db.scalars(
         select(StravaActivityZoneBucket)
@@ -386,6 +434,10 @@ def ingest_activity_event(
     trigger_type: str = "webhook",
     job_id: int | None = None,
     backfill_run_id: int | None = None,
+    *,
+    batch_static_athlete_prefetched: bool = False,
+    prefetch_athlete_zones_snapshot: bool = False,
+    defer_gear_detail: bool = False,
 ) -> dict[str, Any]:
     strava = StravaService()
     with SessionLocal() as db:
@@ -440,33 +492,40 @@ def ingest_activity_event(
                 log.info("Zone enrichment unavailable | activity=%s error=%s", activity_id, exc)
                 zones = None
 
-            try:
-                athlete_zones = strava.get_athlete_zones(db, user=user)
-            except Exception as exc:
-                log.info("Athlete zone snapshot unavailable | activity=%s error=%s", activity_id, exc)
+            if batch_static_athlete_prefetched:
                 athlete_zones = None
+            else:
+                try:
+                    athlete_zones = strava.get_athlete_zones(db, user=user)
+                except Exception as exc:
+                    log.info("Athlete zone snapshot unavailable | activity=%s error=%s", activity_id, exc)
+                    athlete_zones = None
 
             activity = _upsert_activity(db, detail, owner_id, laps, zones)
             db.flush()
-            has_athlete_zones = _store_athlete_zones(db, activity.athlete_id, athlete_zones)
+            if batch_static_athlete_prefetched:
+                has_athlete_zones = prefetch_athlete_zones_snapshot
+            else:
+                has_athlete_zones = _store_athlete_zones(db, activity.athlete_id, athlete_zones)
             if has_athlete_zones:
                 activity.data_quality = {**activity.data_quality, "has_athlete_zones_snapshot": True}
             _replace_child_rows(db, activity_id, activity.athlete_id, detail, laps, zones)
             db.flush()
             _build_activity_metrics(db, activity)
 
-            try:
-                sync_athlete_profile(db, user, strava)
-            except Exception as exc:
-                log.warning("Athlete profile sync failed | activity=%s error=%s", activity_id, exc)
+            if not batch_static_athlete_prefetched:
+                try:
+                    sync_athlete_profile(db, user, strava)
+                except Exception as exc:
+                    log.warning("Athlete profile sync failed | activity=%s error=%s", activity_id, exc)
 
-            try:
-                sync_athlete_stats(db, user, strava)
-            except Exception as exc:
-                log.warning("Athlete stats sync failed | activity=%s error=%s", activity_id, exc)
+                try:
+                    sync_athlete_stats(db, user, strava)
+                except Exception as exc:
+                    log.warning("Athlete stats sync failed | activity=%s error=%s", activity_id, exc)
 
             gear_id = detail.get("gear_id")
-            if gear_id:
+            if gear_id and not defer_gear_detail:
                 try:
                     sync_gear_detail(db, user, gear_id, strava)
                 except Exception as exc:

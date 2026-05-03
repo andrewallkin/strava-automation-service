@@ -37,7 +37,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-/** Matches working Cursor setup: mcp-remote + env-based Bearer (avoids clients splitting args on spaces). */
+/** Claude Desktop / mcp-remote: Bearer token in env (keeps the secret out of CLI args). */
 const MCP_CLIENT_JSON = `{
   "mcpServers": {
     "strava-vps-remote": {
@@ -100,7 +100,7 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [mcpKeys, setMcpKeys] = useState<McpApiKey[]>([]);
   const [newMcpKey, setNewMcpKey] = useState<string | null>(null);
-  const [mcpKeyName, setMcpKeyName] = useState("Claude Desktop");
+  const [mcpKeyName, setMcpKeyName] = useState("");
   const [mcpKeyCopyNotice, setMcpKeyCopyNotice] = useState<CopyNotice | null>(null);
   const [mcpConfigCopyNotice, setMcpConfigCopyNotice] = useState<CopyNotice | null>(null);
 
@@ -131,8 +131,10 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
   };
 
   const handleCreateMcpKey = async () => {
+    const trimmed = mcpKeyName.trim();
+    if (!trimmed) return;
     try {
-      const created = await createMcpApiKey(mcpKeyName);
+      const created = await createMcpApiKey(trimmed);
       setNewMcpKey(created.api_key ?? null);
       setMcpKeys((current) => [created, ...current]);
       setMessage(null);
@@ -152,8 +154,10 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
     }
   };
 
+  const canGenerateMcpKey = mcpKeyName.trim().length > 0;
+
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="w-full space-y-4">
       {message && (
         <div
           role="alert"
@@ -203,9 +207,9 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
         <div className="px-5 py-4">
           <h2 className="text-sm font-semibold text-gray-900">MCP access</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Generate an API key for Cursor, Claude Desktop, or any MCP client over{" "}
-            <code className="text-gray-700">mcp-remote</code>. Keys can only read activities for your
-            connected Strava athlete (same tools as the hosted MCP server).
+            Generate an API key for Claude Desktop (or any MCP client that uses the same JSON shape) with{" "}
+            <code className="text-gray-700">mcp-remote</code>. Keys can only read activities for your connected
+            Strava athlete (same tools as the hosted MCP server).
           </p>
         </div>
 
@@ -214,13 +218,15 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
             <input
               value={mcpKeyName}
               onChange={(event) => setMcpKeyName(event.target.value)}
-              placeholder="Key name"
-              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              placeholder="e.g. Work laptop"
+              aria-label="Key name"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
             />
             <button
               type="button"
+              disabled={!canGenerateMcpKey}
               onClick={handleCreateMcpKey}
-              className="px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
             >
               Generate key
             </button>
@@ -268,22 +274,40 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
           )}
 
           <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-700">Your keys</p>
             {mcpKeys.length === 0 ? (
               <p className="text-xs text-gray-500">No MCP keys yet.</p>
             ) : (
               mcpKeys.map((key) => (
-                <div key={key.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2">
-                  <div>
+                <div
+                  key={key.id}
+                  className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-3"
+                >
+                  <div className="min-w-0 flex-1 space-y-2">
                     <p className="text-sm font-medium text-gray-900">{key.name || "Unnamed key"}</p>
-                    <p className="text-xs text-gray-500">
-                      Prefix {key.key_prefix} - Created {key.created_at ? new Date(key.created_at).toLocaleString() : "unknown"}
-                      {key.last_used_at ? ` - Last used ${new Date(key.last_used_at).toLocaleString()}` : ""}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                        Prefix
+                      </span>
+                      <code className="rounded-md bg-white px-2 py-0.5 text-xs text-gray-800 border border-gray-200 font-mono">
+                        {key.key_prefix}
+                      </code>
+                    </div>
+                    <div className="grid gap-1 text-xs text-gray-600 sm:grid-cols-2 sm:gap-x-4">
+                      <p>
+                        <span className="text-gray-500">Created</span>{" "}
+                        {key.created_at ? new Date(key.created_at).toLocaleString() : "—"}
+                      </p>
+                      <p>
+                        <span className="text-gray-500">Last used</span>{" "}
+                        {key.last_used_at ? new Date(key.last_used_at).toLocaleString() : "Never used"}
+                      </p>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleRevokeMcpKey(key.id)}
-                    className="px-3 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100"
+                    className="w-full shrink-0 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 sm:w-auto sm:self-center"
                   >
                     Revoke
                   </button>
@@ -292,10 +316,50 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
             )}
           </div>
 
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-2">
+            <h3 className="text-xs font-semibold text-gray-900">Claude Desktop setup</h3>
+            <ol className="list-decimal list-inside space-y-2 text-xs text-gray-600">
+              <li>
+                <span className="font-medium text-gray-800">Generate a key</span> above and copy it when the
+                orange box appears — you will not see the full secret again.
+              </li>
+              <li>
+                <span className="font-medium text-gray-800">Open </span>
+                <code className="text-gray-800">claude_desktop_config.json</code>
+                <span className="font-medium text-gray-800">:</span>
+                <ul className="mt-1.5 ml-4 list-disc list-inside space-y-1.5 text-gray-600">
+                  <li>
+                    <span className="text-gray-800">macOS:</span> In Claude Desktop, choose{" "}
+                    <span className="text-gray-800">Settings → Developer → Edit Config</span>. Or in Finder:{" "}
+                    <span className="text-gray-800">Go → Go to Folder…</span> (⌘⇧G), paste{" "}
+                    <code className="text-gray-800">~/Library/Application Support/Claude</code>, then open{" "}
+                    <code className="text-gray-800">claude_desktop_config.json</code>.
+                  </li>
+                  <li>
+                    <span className="text-gray-800">Windows:</span> Press <kbd className="rounded border border-gray-300 bg-white px-1">Win</kbd>+
+                    <kbd className="rounded border border-gray-300 bg-white px-1">R</kbd>, type{" "}
+                    <code className="text-gray-800">%APPDATA%\Claude</code>, press Enter, then open{" "}
+                    <code className="text-gray-800">claude_desktop_config.json</code> (you can also paste that
+                    path into File Explorer’s address bar).
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <span className="font-medium text-gray-800">Merge</span> the <code className="text-gray-800">strava-vps-remote</code>{" "}
+                entry from the snippet below into your file’s <code className="text-gray-800">mcpServers</code>{" "}
+                object. If <code className="text-gray-800">mcpServers</code> already exists, add this server alongside your others — do not remove unrelated servers.
+              </li>
+              <li>
+                <span className="font-medium text-gray-800">Quit and restart Claude Desktop</span> fully so MCP
+                reloads.
+              </li>
+            </ol>
+          </div>
+
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <p className="text-xs font-medium text-gray-700">
-                Cursor / Claude Desktop (<code className="text-gray-600">~/.cursor/mcp.json</code> etc.)
+                Configuration snippet (<code className="text-gray-600">claude_desktop_config.json</code>)
               </p>
               <button
                 type="button"
@@ -315,19 +379,19 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
                 Copy JSON
               </button>
             </div>
-            <p className="text-xs text-gray-500 mb-2">
-              Uses <code className="text-gray-700">npx mcp-remote</code> with{" "}
-              <code className="text-gray-700">--transport sse-only</code>. Put your full key (including{" "}
-              <code className="text-gray-700">sva_mcp_…</code>) in place of{" "}
-              <code className="text-gray-700">YOUR_SVA_MCP_KEY_HERE</code> — keep the{" "}
-              <code className="text-gray-700">Bearer </code>
-              prefix inside <code className="text-gray-700">STRAVA_MCP_AUTH_HEADER</code>. The{" "}
-              <code className="text-gray-700">--header</code> line is{" "}
-              <code className="text-gray-700">{'Authorization:${STRAVA_MCP_AUTH_HEADER}'}</code> so{" "}
-              <code className="text-gray-700">mcp-remote</code> expands the env var (some MCP hosts split{" "}
-              <code className="text-gray-700">args</code> on spaces if you put <code className="text-gray-700">Bearer</code>{" "}
-              and the token in one string).
-            </p>
+            <ul className="text-xs text-gray-600 mb-2 space-y-1 list-disc list-inside">
+              <li>
+                Use <strong className="font-medium text-gray-800">Copy JSON</strong> or select the block below.
+              </li>
+              <li>
+                Replace <code className="text-gray-800">YOUR_SVA_MCP_KEY_HERE</code> with your full key (the{" "}
+                <code className="text-gray-800">sva_mcp_…</code> value). Keep the <code className="text-gray-800">Bearer </code>
+                prefix in <code className="text-gray-800">STRAVA_MCP_AUTH_HEADER</code>.
+              </li>
+              <li>
+                The key lives in <code className="text-gray-800">env</code> so it is not passed as a separate CLI argument.
+              </li>
+            </ul>
             {mcpConfigCopyNotice && (
               <p
                 className={`text-xs mb-2 ${mcpConfigCopyNotice.ok ? "text-green-800" : "text-orange-900"}`}
