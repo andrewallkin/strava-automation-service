@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import require_jwt_user
 from app.models import EventLog, PendingActivity, User
-from app.services.activity_service import list_gear
+from app.services.activity_service import include_gear_in_shoe_vault, list_gear
 from app.services.mcp_api_key_service import create_mcp_api_key, list_mcp_api_keys, revoke_mcp_api_key
 from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
@@ -257,6 +257,8 @@ def shoe_vault(
     result = []
     for gear in gears:
         detail = strava.get_gear_detail(db, user, gear.strava_gear_id)
+        if not include_gear_in_shoe_vault(detail):
+            continue
         result.append(
             {
                 "strava_gear_id": gear.strava_gear_id,

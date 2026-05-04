@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -44,6 +45,15 @@ def upsert_gear(db: Session, strava_gear_id: str, name: str, is_default: bool = 
 
 def list_gear(db: Session) -> list[Gear]:
     return list(db.scalars(select(Gear).order_by(Gear.name.asc())).all())
+
+
+def include_gear_in_shoe_vault(detail: dict[str, Any]) -> bool:
+    """True if Strava DetailedGear is an active running shoe (exclude bikes/trainers and retired)."""
+    if detail.get("retired") is True:
+        return False
+    if detail.get("frame_type") is not None:
+        return False
+    return True
 
 
 def set_pending_activity(db: Session, activity_id: int, telegram_message_id: int) -> PendingActivity:
