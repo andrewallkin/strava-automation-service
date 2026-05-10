@@ -17,20 +17,12 @@ def _default_store() -> dict[str, Any]:
     }
 
 
-def _is_user_input_item(item: Any) -> bool:
-    if not isinstance(item, dict):
-        return False
-    return item.get("role") == "user"
-
-
-def cap_by_user_turns(history: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+def cap_by_history_items(history: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     if limit <= 0:
         return []
-    user_indexes = [idx for idx, item in enumerate(history) if _is_user_input_item(item)]
-    if len(user_indexes) <= limit:
+    if len(history) <= limit:
         return history
-    first_keep_idx = user_indexes[-limit]
-    return history[first_keep_idx:]
+    return history[-limit:]
 
 
 class CoachConversationStore:
@@ -98,17 +90,17 @@ class CoachConversationStore:
         )
         return history
 
-    def save_history(self, user_id: int, history: list[dict[str, Any]], user_turn_limit: int) -> None:
+    def save_history(self, user_id: int, history: list[dict[str, Any]], history_item_limit: int) -> None:
         store = self.load_store(user_id)
         conv_id = store.get("last_active_conversation_id") or DEFAULT_CONVERSATION_ID
         log.info(
-            "Saving conversation history for user_id=%s conversation_id=%s incoming_items=%s user_turn_limit=%s",
+            "Saving conversation history for user_id=%s conversation_id=%s incoming_items=%s history_item_limit=%s",
             user_id,
             conv_id,
             len(history),
-            user_turn_limit,
+            history_item_limit,
         )
-        capped = cap_by_user_turns(history, user_turn_limit)
+        capped = cap_by_history_items(history, history_item_limit)
         if len(capped) < len(history):
             log.info(
                 "Conversation history truncated for user_id=%s conversation_id=%s removed_items=%s",
@@ -122,11 +114,11 @@ class CoachConversationStore:
         store["conversations"] = {conv_id: capped}
         self.save_store(user_id, store)
 
-    def append_history(self, user_id: int, items: list[dict[str, Any]], user_turn_limit: int) -> list[dict[str, Any]]:
+    def append_history(self, user_id: int, items: list[dict[str, Any]], history_item_limit: int) -> list[dict[str, Any]]:
         log.info("Appending conversation items for user_id=%s items_to_append=%s", user_id, len(items))
         history = list(self.get_history(user_id))
         history.extend(items)
-        self.save_history(user_id, history, user_turn_limit)
+        self.save_history(user_id, history, history_item_limit)
         updated = self.get_history(user_id)
         log.info("Conversation append completed for user_id=%s updated_history_items=%s", user_id, len(updated))
         return updated

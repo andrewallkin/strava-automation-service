@@ -8,7 +8,7 @@ from app.deps import require_jwt_user
 from app.main import app
 from app.models import User
 from app.routers.telegram_coach_webhook import _parse_start_code
-from app.services.coach_conversation_store import cap_by_user_turns
+from app.services.coach_conversation_store import cap_by_history_items
 
 
 def test_parse_start_code() -> None:
@@ -17,7 +17,7 @@ def test_parse_start_code() -> None:
     assert _parse_start_code("hello") is None
 
 
-def test_cap_by_user_turns_keeps_last_user_turns() -> None:
+def test_cap_by_history_items_keeps_last_entries() -> None:
     history = [
         {"role": "user", "content": [{"type": "input_text", "text": "u1"}]},
         {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "a1"}]},
@@ -26,8 +26,8 @@ def test_cap_by_user_turns_keeps_last_user_turns() -> None:
         {"role": "user", "content": [{"type": "input_text", "text": "u3"}]},
         {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "a3"}]},
     ]
-    capped = cap_by_user_turns(history, 2)
-    assert capped[0]["content"][0]["text"] == "u2"
+    capped = cap_by_history_items(history, 2)
+    assert capped[0]["content"][0]["text"] == "u3"
     assert capped[-1]["content"][0]["text"] == "a3"
 
 

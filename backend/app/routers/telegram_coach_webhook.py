@@ -119,7 +119,7 @@ async def coach_telegram_webhook(
     log.info("Retrieving conversation history for app_user_id=%s", user.id)
     history = history_store.get_history(user.id)
     log.info("Conversation history ready for app_user_id=%s history_items=%s", user.id, len(history))
-    turn_limit = max(settings.coach_conversation_history_user_turn_limit, 1)
+    history_item_limit = max(settings.coach_conversation_history_user_turn_limit, 1)
 
     try:
         reply_text, new_items = await CoachOpenAIService().run_turn(
@@ -138,7 +138,7 @@ async def coach_telegram_webhook(
         return {"status": "error", "detail": "processing_failed"}
 
     log.info("Persisting updated conversation history for app_user_id=%s", user.id)
-    history_store.append_history(user.id, new_items, turn_limit)
+    history_store.append_history(user.id, new_items, history_item_limit)
     log.info("Sending coach response to Telegram for app_user_id=%s chat_id=%s", user.id, chat_id)
     try:
         telegram.send_message(chat_id, reply_text)
