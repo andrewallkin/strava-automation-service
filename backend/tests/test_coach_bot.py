@@ -144,6 +144,65 @@ def test_coach_webhook_message_uses_history_and_sends_reply() -> None:
                     [{"role": "user"}, {"type": "message", "role": "assistant"}],
                     20,
                 )
-                mock_send.assert_called_with(12345, "Nice session.", content_is_markup=True)
+                mock_send.assert_called_with(12345, "Nice session.")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_coach_webhook_handles_telegram_delivery_failure_without_rerunning_agent() -> None:
+    settings = SimpleNamespace(
+        coach_telegram_webhook_secret="coach-secret",
+        coach_telegram_allowed_user_id=12345,
+        coach_conversation_history_user_turn_limit=20,
+    )
+    user = User(id=9, telegram_user_id=12345)
+    coach_settings = SimpleNamespace(
+        vector_store_id="vs_123",
+        agent_name="Coach",
+        agent_instructions="Be concise",
+        openai_model="gpt-4.1-mini",
+    )
+    mock_db = MagicMock()
+    mock_db.scalar.side_effect = [user]
+
+    def override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        payload = {
+            "message": {
+                "text": "How was my run?",
+                "from": {"id": 12345},
+                "chat": {"id": 12345},
+            }
+        }
+        with patch("app.routers.telegram_coach_webhook.get_settings", return_value=settings), patch(
+            "app.routers.telegram_coach_webhook.get_redis_client"
+        ) as mock_redis, patch(
+            "app.routers.telegram_coach_webhook.get_or_create_coach_settings",
+            return_value=coach_settings,
+        ), patch(
+            "app.routers.telegram_coach_webhook.CoachOpenAIService.run_turn",
+            new=AsyncMock(
+                return_value=("Nice session.", [{"role": "user"}, {"type": "message", "role": "assistant"}])
+            ),
+        ) as mock_run_turn, patch(
+            "app.routers.telegram_coach_webhook.CoachTelegramService.send_message",
+            side_effect=RuntimeError("telegram failed"),
+        ):
+            mock_store = MagicMock()
+            mock_store.get_history.return_value = []
+            with patch("app.routers.telegram_coach_webhook.CoachConversationStore", return_value=mock_store):
+                mock_redis.return_value = MagicMock()
+                response = TestClient(app).post("/api/telegram/coach/webhook/coach-secret", json=payload)
+                assert response.status_code == 200
+                assert response.json() == {"status": "error", "detail": "telegram_delivery_failed"}
+                mock_run_turn.assert_called_once()
+                mock_store.append_history.assert_called_once_with(
+                    9,
+                    [{"role": "user"}, {"type": "message", "role": "assistant"}],
+                    20,
+                )
     finally:
         app.dependency_overrides.pop(get_db, None)

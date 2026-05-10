@@ -140,6 +140,10 @@ async def coach_telegram_webhook(
     log.info("Persisting updated conversation history for app_user_id=%s", user.id)
     history_store.append_history(user.id, new_items, turn_limit)
     log.info("Sending coach response to Telegram for app_user_id=%s chat_id=%s", user.id, chat_id)
-    telegram.send_message(chat_id, reply_text, content_is_markup=True)
+    try:
+        telegram.send_message(chat_id, reply_text)
+    except Exception:
+        log.exception("Coach response delivery to Telegram failed for app_user_id=%s chat_id=%s", user.id, chat_id)
+        return {"status": "error", "detail": "telegram_delivery_failed"}
     log.info("Coach webhook flow completed successfully for app_user_id=%s", user.id)
     return {"status": "ok"}

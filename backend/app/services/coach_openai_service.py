@@ -11,25 +11,19 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models import User, UserCoachSettings
 from app.services.openai_credential_service import get_openai_api_key_for_user
-from app.services.telegram_markdown import escape_markdown_v2
 
 log = logging.getLogger("coach.agent")
 
 
 TELEGRAM_MARKDOWN_V2_OUTPUT = """
-Output format (Telegram MarkdownV2)
+Output format (Telegram-safe plain text)
 
-Your replies are sent in Telegram MarkdownV2. Invalid markup may prevent delivery; stay within these features.
+Your replies are sent to Telegram by the application. The application handles MarkdownV2 escaping.
 
-Formatting examples (escape inner special characters where Telegram requires it):
-*bold \\*text*
-_italic \\*text_
-__underline__
-~strikethrough~
-||spoiler||
-*bold _italic bold ~italic bold strikethrough ||italic bold strikethrough spoiler||~ __underline italic bold___ bold*
+Write normal plain text. Do not include MarkdownV2 backslash escapes such as \\., \\!, \\(, or \\-.
+Do not use Markdown formatting markers for bold, italics, links, code blocks, or tables.
 
-Lists: prefer numbered lists (1. item) or the UTF-8 bullet character • for bullets. Do not use a hyphen-minus at the start of list lines as a bullet; "-" is awkward in MarkdownV2.
+Lists: prefer numbered lists (1. item) or the UTF-8 bullet character • for bullets.
 """.strip()
 
 
@@ -219,9 +213,7 @@ class CoachOpenAIService:
         output_items = [_json_safe(item.to_input_item()) for item in result.new_items]
         response_text = result.final_output_as(str).strip()
         if not response_text:
-            response_text = escape_markdown_v2(
-                "I couldn't generate a response just now. Please try again."
-            )
+            response_text = "I couldn't generate a response just now. Please try again."
         log.info(
             "Coach agent turn completed for user_id=%s output_items=%s response_length=%s",
             user.id,
