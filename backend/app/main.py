@@ -33,6 +33,7 @@ def _configure_logging() -> None:
             "auth":           {"handlers": ["console"], "level": log_level, "propagate": False},
             "db":             {"handlers": ["console"], "level": log_level, "propagate": False},
             "ingestion":      {"handlers": ["console"], "level": log_level, "propagate": False},
+            "coach":          {"handlers": ["console"], "level": log_level, "propagate": False},
         },
         "root": {"handlers": ["console"], "level": "WARNING"},
     })
