@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+from time import perf_counter
 from typing import Any
 
 from agents import Agent, FileSearchTool, HostedMCPTool, ModelSettings, Runner
@@ -9,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models import User, UserCoachSettings
 from app.services.openai_credential_service import get_openai_api_key_for_user
+
+log = logging.getLogger("coach.agent")
 
 
 def make_user_input_item(text: str) -> dict[str, Any]:
@@ -104,14 +108,22 @@ class CoachOpenAIService:
         history: list[dict[str, Any]],
         user_message: str,
     ) -> tuple[str, list[dict[str, Any]]]:
+        log.info("Coach agent turn started for user_id=%s", user.id)
         api_key = get_openai_api_key_for_user(db, user)
         if not api_key:
+            log.warning("Coach agent run aborted: missing OpenAI API key for user_id=%s", user.id)
             raise ValueError("OpenAI API key is not configured")
         settings = get_settings()
 
         user_item = make_user_input_item(user_message)
         run_input = _prepare_history_for_request(history)
         run_input.append(user_item)
+        log.info(
+            "Prepared conversation payload for user_id=%s history_items=%s request_items=%s",
+            user.id,
+            len(history),
+            len(run_input),
+        )
 
         base_instructions = coach_settings.agent_instructions.strip()
         if base_instructions:
@@ -121,9 +133,17 @@ class CoachOpenAIService:
 
         tools: list[Any] = []
         if coach_settings.vector_store_id:
+            log.info(
+                "Loading FileSearch tool for user_id=%s vector_store_id=%s",
+                user.id,
+                coach_settings.vector_store_id,
+            )
             tools.append(FileSearchTool(vector_store_ids=[coach_settings.vector_store_id]))
+        else:
+            log.info("FileSearch tool disabled for user_id=%s (no vector store configured)", user.id)
 
         if settings.mcp_server_url and settings.strava_mcp_bearer:
+            log.info("Loading MCP tool for user_id=%s server_url=%s", user.id, settings.mcp_server_url)
             tools.append(
                 HostedMCPTool(
                     tool_config={
@@ -137,6 +157,8 @@ class CoachOpenAIService:
                     }
                 )
             )
+        else:
+            log.info("MCP tool disabled for user_id=%s (missing MCP configuration)", user.id)
 
         agent = Agent(
             name=coach_settings.agent_name.strip() or "Coach",
@@ -148,8 +170,21 @@ class CoachOpenAIService:
 
         previous_api_key = os.environ.get("OPENAI_API_KEY")
         os.environ["OPENAI_API_KEY"] = api_key
+        started_at = perf_counter()
         try:
+            log.info(
+                "Invoking OpenAI agent for user_id=%s model=%s tool_count=%s",
+                user.id,
+                coach_settings.openai_model,
+                len(tools),
+            )
             result = await Runner.run(agent, input=run_input)
+            elapsed_ms = int((perf_counter() - started_at) * 1000)
+            log.info("OpenAI agent response received for user_id=%s duration_ms=%s", user.id, elapsed_ms)
+        except Exception:
+            elapsed_ms = int((perf_counter() - started_at) * 1000)
+            log.exception("OpenAI agent invocation failed for user_id=%s duration_ms=%s", user.id, elapsed_ms)
+            raise
         finally:
             if previous_api_key is None:
                 os.environ.pop("OPENAI_API_KEY", None)
@@ -159,4 +194,10 @@ class CoachOpenAIService:
         response_text = result.final_output_as(str).strip()
         if not response_text:
             response_text = "I couldn't generate a response just now. Please try again."
+        log.info(
+            "Coach agent turn completed for user_id=%s output_items=%s response_length=%s",
+            user.id,
+            len(output_items),
+            len(response_text),
+        )
         return response_text, [user_item, *output_items]

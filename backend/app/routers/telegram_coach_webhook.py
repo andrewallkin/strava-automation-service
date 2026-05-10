@@ -47,6 +47,7 @@ async def coach_telegram_webhook(
     message = payload.get("message")
     if not message:
         return {"status": "ignored", "reason": "no message"}
+    log.info("Coach webhook message received")
 
     from_user = message.get("from", {}) or {}
     from_user_id = from_user.get("id")
@@ -64,6 +65,7 @@ async def coach_telegram_webhook(
     telegram = CoachTelegramService()
     text = (message.get("text") or "").strip()
     start_code = _parse_start_code(text)
+    log.info("Initializing Redis access for coach webhook user_id=%s", from_user_id)
     redis_client = get_redis_client()
 
     if start_code is not None:
@@ -98,6 +100,7 @@ async def coach_telegram_webhook(
         user.telegram_user_id = from_user_id
         db.commit()
         telegram.send_message(chat_id, "Your coach bot is linked. Send me a message to start chatting.")
+        log.info("Coach webhook successfully linked Telegram user_id=%s to app_user_id=%s", from_user_id, user.id)
         return {"status": "linked", "user_id": user.id}
 
     user = db.scalar(select(User).where(User.telegram_user_id == from_user_id).limit(1))
@@ -113,7 +116,9 @@ async def coach_telegram_webhook(
 
     coach_settings = get_or_create_coach_settings(db, user)
     history_store = CoachConversationStore(redis_client)
+    log.info("Retrieving conversation history for app_user_id=%s", user.id)
     history = history_store.get_history(user.id)
+    log.info("Conversation history ready for app_user_id=%s history_items=%s", user.id, len(history))
     turn_limit = max(settings.coach_conversation_history_user_turn_limit, 1)
 
     try:
@@ -132,6 +137,9 @@ async def coach_telegram_webhook(
         telegram.send_message(chat_id, "I hit an error while processing that. Please try again.")
         return {"status": "error", "detail": "processing_failed"}
 
+    log.info("Persisting updated conversation history for app_user_id=%s", user.id)
     history_store.append_history(user.id, new_items, turn_limit)
+    log.info("Sending coach response to Telegram for app_user_id=%s chat_id=%s", user.id, chat_id)
     telegram.send_message(chat_id, reply_text)
+    log.info("Coach webhook flow completed successfully for app_user_id=%s", user.id)
     return {"status": "ok"}
