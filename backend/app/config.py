@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     ui_port: int = 3001
     ui_api_base_url: str = "/api"
 
+    # OpenAI (vector store / file search UI — server-side only)
+    openai_api_key: str = ""
+
     @property
     def database_url(self) -> str:
         return (

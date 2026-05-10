@@ -422,6 +422,143 @@ export async function fetchGymSummary(): Promise<GymSummary> {
   return getJson<GymSummary>("/ui/gym-summary");
 }
 
+/** Max upload size for vector store files (must match backend). */
+export const VECTOR_STORE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+export type VectorStore = {
+  id: string;
+  name: string | null;
+  status: string | null;
+  created_at: number | null;
+  file_counts: Record<string, number> | null;
+};
+
+export type VectorStoreFileRow = {
+  file_id: string;
+  vector_store_id: string;
+  status: string | null;
+  created_at: number | null;
+  usage_bytes: number | null;
+  filename: string | null;
+};
+
+export type VectorStoreListResponse = {
+  data: VectorStore[];
+  has_more: boolean;
+  last_id: string | null;
+};
+
+export type VectorStoreFilesResponse = {
+  data: VectorStoreFileRow[];
+  has_more: boolean;
+  last_id: string | null;
+};
+
+async function readUiErrorMessage(response: Response): Promise<string> {
+  const base = `Request failed: ${response.status}`;
+  try {
+    const j = (await response.json()) as { detail?: unknown };
+    const d = j.detail;
+    if (typeof d === "string") return d;
+    if (Array.isArray(d)) {
+      const parts = d.map((x) =>
+        typeof x === "object" && x && "msg" in x ? String((x as { msg: unknown }).msg) : String(x)
+      );
+      return parts.join(", ") || base;
+    }
+  } catch {
+    /* ignore */
+  }
+  return base;
+}
+
+export async function fetchVectorStores(params?: {
+  limit?: number;
+  after?: string | null;
+}): Promise<VectorStoreListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.after) sp.set("after", params.after);
+  const q = sp.toString();
+  const response = await fetch(`${API_BASE}/ui/vector-stores${q ? `?${q}` : ""}`, FETCH_OPTS);
+  handle401(response, true);
+  if (!response.ok) throw new Error(await readUiErrorMessage(response));
+  return (await response.json()) as VectorStoreListResponse;
+}
+
+export async function createVectorStore(name?: string | null): Promise<VectorStore> {
+  const response = await fetch(`${API_BASE}/ui/vector-stores`, {
+    ...FETCH_OPTS,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name?.trim() || null })
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(await readUiErrorMessage(response));
+  return (await response.json()) as VectorStore;
+}
+
+export async function fetchVectorStore(vectorStoreId: string): Promise<VectorStore> {
+  const response = await fetch(
+    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}`,
+    FETCH_OPTS
+  );
+  handle401(response, true);
+  if (!response.ok) throw new Error(await readUiErrorMessage(response));
+  return (await response.json()) as VectorStore;
+}
+
+export async function fetchVectorStoreFiles(
+  vectorStoreId: string,
+  params?: { limit?: number; after?: string | null }
+): Promise<VectorStoreFilesResponse> {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.after) sp.set("after", params.after);
+  const q = sp.toString();
+  const response = await fetch(
+    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}/files${q ? `?${q}` : ""}`,
+    FETCH_OPTS
+  );
+  handle401(response, true);
+  if (!response.ok) throw new Error(await readUiErrorMessage(response));
+  return (await response.json()) as VectorStoreFilesResponse;
+}
+
+export async function uploadVectorStoreFile(
+  vectorStoreId: string,
+  file: File
+): Promise<VectorStoreFileRow> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const response = await fetch(
+    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}/files`,
+    {
+      ...FETCH_OPTS,
+      method: "POST",
+      body: fd
+    }
+  );
+  handle401(response, true);
+  if (!response.ok) throw new Error(await readUiErrorMessage(response));
+  return (await response.json()) as VectorStoreFileRow;
+}
+
+export async function deleteVectorStoreFile(
+  vectorStoreId: string,
+  fileId: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}/files/${encodeURIComponent(fileId)}`,
+    {
+      ...FETCH_OPTS,
+      method: "DELETE"
+    }
+  );
+  handle401(response, true);
+  if (!response.ok) throw new Error(await readUiErrorMessage(response));
+}
+
 export async function disconnectStrava(): Promise<void> {
   const response = await fetch(`${API_BASE}/auth/strava/disconnect`, {
     ...FETCH_OPTS,

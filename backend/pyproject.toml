@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
   "alembic>=1.14.0",
   "fastapi>=0.115.0",
+  "openai>=1.60.0",
   "fastmcp",
   "itsdangerous>=2.0",
   "httpx>=0.28.0",
