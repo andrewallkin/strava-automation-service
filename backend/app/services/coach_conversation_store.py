@@ -9,6 +9,13 @@ from redis import Redis
 DEFAULT_CONVERSATION_ID = "default"
 log = logging.getLogger("coach.conversation")
 
+STORED_CONVERSATION_ITEM_TYPES = {
+    "file_search_call",
+    "mcp_call",
+    "message",
+    "reasoning",
+}
+
 
 def _default_store() -> dict[str, Any]:
     return {
@@ -23,6 +30,24 @@ def cap_by_history_items(history: list[dict[str, Any]], limit: int) -> list[dict
     if len(history) <= limit:
         return history
     return history[-limit:]
+
+
+def should_store_history_item(item: dict[str, Any]) -> bool:
+    item_type = item.get("type")
+    if item_type == "mcp_list_tools":
+        return False
+    if item_type in STORED_CONVERSATION_ITEM_TYPES:
+        return True
+    role = item.get("role")
+    if role == "user" and item_type is None:
+        return True
+    if role == "assistant" and item_type is None:
+        return True
+    return False
+
+
+def filter_history_for_storage(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [item for item in history if isinstance(item, dict) and should_store_history_item(item)]
 
 
 class CoachConversationStore:
@@ -100,13 +125,21 @@ class CoachConversationStore:
             len(history),
             history_item_limit,
         )
-        capped = cap_by_history_items(history, history_item_limit)
-        if len(capped) < len(history):
+        filtered = filter_history_for_storage(history)
+        if len(filtered) < len(history):
+            log.info(
+                "Conversation history filtered for storage user_id=%s conversation_id=%s removed_items=%s",
+                user_id,
+                conv_id,
+                len(history) - len(filtered),
+            )
+        capped = cap_by_history_items(filtered, history_item_limit)
+        if len(capped) < len(filtered):
             log.info(
                 "Conversation history truncated for user_id=%s conversation_id=%s removed_items=%s",
                 user_id,
                 conv_id,
-                len(history) - len(capped),
+                len(filtered) - len(capped),
             )
         else:
             log.info("Conversation history did not require truncation for user_id=%s", user_id)

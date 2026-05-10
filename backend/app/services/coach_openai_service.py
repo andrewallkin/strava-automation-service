@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import User, UserCoachSettings
+from app.services.coach_conversation_store import should_store_history_item
 from app.services.openai_credential_service import get_openai_api_key_for_user
 
 log = logging.getLogger("coach.agent")
@@ -101,14 +102,11 @@ def _prepare_history_for_request(history: list[dict[str, Any]]) -> list[dict[str
         if not isinstance(item, dict):
             continue
         item_type = item.get("type")
-        role = item.get("role")
         if item_type == "mcp_list_tools":
             continue
-        if role in {"user", "assistant", "system", "developer"}:
+        if should_store_history_item(item):
             prepared.append(item)
             continue
-        if item_type == "message":
-            prepared.append(item)
     return prepared
 
 

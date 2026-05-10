@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -8,7 +9,11 @@ from app.deps import require_jwt_user
 from app.main import app
 from app.models import User
 from app.routers.telegram_coach_webhook import _parse_start_code
-from app.services.coach_conversation_store import cap_by_history_items
+from app.services.coach_conversation_store import (
+    CoachConversationStore,
+    cap_by_history_items,
+    filter_history_for_storage,
+)
 
 
 def test_parse_start_code() -> None:
@@ -29,6 +34,52 @@ def test_cap_by_history_items_keeps_last_entries() -> None:
     capped = cap_by_history_items(history, 2)
     assert capped[0]["content"][0]["text"] == "u3"
     assert capped[-1]["content"][0]["text"] == "a3"
+
+
+def test_filter_history_for_storage_excludes_mcp_tool_lists() -> None:
+    history = [
+        {"role": "user", "content": [{"type": "input_text", "text": "How was my run?"}]},
+        {"type": "mcp_list_tools", "server_label": "Strava_MCP", "tools": [{"name": "search_activities"}]},
+        {"type": "file_search_call", "queries": ["marathon plan"], "results": [{"text": "long run"}]},
+        {"type": "mcp_call", "name": "search_activities", "arguments": "{}", "output": "5 activities"},
+        {"type": "reasoning", "summary": [{"text": "Need recent training context."}]},
+        {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "Nice run."}]},
+        {"type": "web_search_call", "query": "unrelated"},
+        {"role": "system", "content": "not persisted"},
+    ]
+
+    filtered = filter_history_for_storage(history)
+
+    assert filtered == [
+        history[0],
+        history[2],
+        history[3],
+        history[4],
+        history[5],
+    ]
+
+
+def test_save_history_filters_before_persisting_to_redis() -> None:
+    redis = MagicMock()
+    redis.get.return_value = None
+    store = CoachConversationStore(redis)
+
+    store.save_history(
+        9,
+        [
+            {"role": "user", "content": [{"type": "input_text", "text": "How was my run?"}]},
+            {"type": "mcp_list_tools", "tools": [{"name": "search_activities"}]},
+            {"type": "mcp_call", "name": "search_activities", "output": "5 activities"},
+        ],
+        20,
+    )
+
+    saved = json.loads(redis.set.call_args.args[1])
+    history = saved["conversations"]["default"]
+    assert history == [
+        {"role": "user", "content": [{"type": "input_text", "text": "How was my run?"}]},
+        {"type": "mcp_call", "name": "search_activities", "output": "5 activities"},
+    ]
 
 
 def test_coach_link_code_endpoint() -> None:
