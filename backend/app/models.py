@@ -69,6 +69,28 @@ class UserOpenAiApiKey(Base):
     )
 
 
+class UserCoachSettings(Base):
+    __tablename__ = "user_coach_settings"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    vector_store_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    agent_name: Mapped[str] = mapped_column(String(255), nullable=False, default="Coach")
+    agent_instructions: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    openai_model: Mapped[str] = mapped_column(String(128), nullable=False, default="gpt-4.1-mini")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 class Gear(Base):
     __tablename__ = "gear"
 

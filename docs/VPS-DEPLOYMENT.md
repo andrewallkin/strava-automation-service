@@ -97,6 +97,11 @@ TELEGRAM_BOT_TOKEN=<your_bot_token>
 TELEGRAM_WEBHOOK_SECRET=<long_random_string>
 TELEGRAM_ALLOWED_USER_ID=<your_numeric_telegram_id>
 TELEGRAM_WEBHOOK_URL=https://yourdomain.com/api/telegram/webhook/<same_value_as_TELEGRAM_WEBHOOK_SECRET>
+COACH_TELEGRAM_BOT_TOKEN=<your_second_bot_token>
+COACH_TELEGRAM_WEBHOOK_SECRET=<long_random_string_for_coach_bot>
+COACH_TELEGRAM_ALLOWED_USER_ID=<your_numeric_telegram_id>
+COACH_TELEGRAM_WEBHOOK_URL=https://yourdomain.com/api/telegram/coach/webhook/<same_value_as_COACH_TELEGRAM_WEBHOOK_SECRET>
+REDIS_URL=redis://redis:6379/0
 
 # Security
 APP_SECRET_KEY=<32_plus_random_characters>

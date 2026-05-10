@@ -1,15 +1,18 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   VECTOR_STORE_MAX_FILE_BYTES,
   VectorStore,
   VectorStoreFileRow,
   createVectorStore,
+  fetchCoachSettings,
   deleteVectorStore,
   deleteVectorStoreFile,
   fetchVectorStore,
   fetchVectorStoreFiles,
   fetchVectorStores,
+  updateCoachSettings,
   uploadVectorStoreFile,
 } from "../lib/api";
 
@@ -54,6 +57,8 @@ export function VectorStorePage() {
   const [uploading, setUploading] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [coachVectorStoreId, setCoachVectorStoreId] = useState<string | null>(null);
+  const [coachSaveBusy, setCoachSaveBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadStores = useCallback(async () => {
@@ -73,6 +78,14 @@ export function VectorStorePage() {
   useEffect(() => {
     void loadStores();
   }, [loadStores]);
+
+  useEffect(() => {
+    fetchCoachSettings()
+      .then((settings) => setCoachVectorStoreId(settings.vector_store_id))
+      .catch(() => {
+        /* ignore when not configured */
+      });
+  }, []);
 
   useEffect(() => {
     try {
@@ -185,6 +198,22 @@ export function VectorStorePage() {
     setPendingConfirm({ type: "deleteStore" });
   };
 
+  const onUseStoreForCoach = async () => {
+    if (!selectedId) return;
+    setCoachSaveBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const next = await updateCoachSettings({ vector_store_id: selectedId });
+      setCoachVectorStoreId(next.vector_store_id);
+      setMessage("Coach bot now uses this vector store");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save coach vector store");
+    } finally {
+      setCoachSaveBusy(false);
+    }
+  };
+
   const runConfirmedAction = async () => {
     if (!pendingConfirm || !selectedId) return;
     setConfirmBusy(true);
@@ -233,7 +262,7 @@ export function VectorStorePage() {
           Manage OpenAI vector stores and uploaded documents (markdown and PDF only, max 10&nbsp;MB).
           Use a store ID in your agent or notebook{" "}
           <code className="text-xs bg-gray-100 px-1 rounded">VECTOR_STORE_ID</code> environment
-          variable.
+          variable. You can also assign a store directly to your coach bot from this page.
         </p>
       </div>
 
@@ -306,6 +335,9 @@ export function VectorStorePage() {
                       <div className="text-xs text-gray-400 mt-1">
                         Status: {s.status ?? "-"} · Files: {fileCountsLabel(s)}
                       </div>
+                      {coachVectorStoreId === s.id && (
+                        <div className="text-xs text-orange-700 mt-1 font-medium">Coach bot store</div>
+                      )}
                     </button>
                   </li>
                 ))}
@@ -336,6 +368,32 @@ export function VectorStorePage() {
                     <dt className="text-gray-500">Created</dt>
                     <dd>{formatUnix(selectedDetail.created_at)}</dd>
                   </dl>
+                )}
+
+                {selectedId && (
+                  <div className="rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-3 space-y-2">
+                    <p className="text-xs text-orange-900 font-medium">
+                      {coachVectorStoreId === selectedId
+                        ? "This store is currently used by your coach bot."
+                        : "Use this store as the coach bot knowledge base."}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void onUseStoreForCoach()}
+                        disabled={coachSaveBusy || coachVectorStoreId === selectedId}
+                        className="px-3 py-1.5 rounded-md bg-orange-500 text-white text-xs font-medium hover:bg-orange-600 disabled:opacity-50"
+                      >
+                        {coachSaveBusy ? "Saving…" : "Use for coach"}
+                      </button>
+                      <Link
+                        to="/settings"
+                        className="px-3 py-1.5 rounded-md bg-white border border-orange-200 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                      >
+                        Open coach settings
+                      </Link>
+                    </div>
+                  </div>
                 )}
 
                 <div className="pt-2 border-t border-gray-100">

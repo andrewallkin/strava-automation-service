@@ -142,6 +142,27 @@ export type OpenAiApiKeyStatus = {
   updated_at: string | null;
 };
 
+export type CoachSettings = {
+  vector_store_id: string | null;
+  agent_name: string;
+  agent_instructions: string;
+  openai_model: string;
+  telegram_user_id: number | null;
+  telegram_linked: boolean;
+};
+
+export type CoachSettingsUpdate = {
+  vector_store_id?: string | null;
+  agent_name?: string;
+  agent_instructions?: string;
+  openai_model?: string;
+};
+
+export type CoachLinkCodeResponse = {
+  code: string;
+  expires_in_seconds: number;
+};
+
 export type EventRow = {
   id: number;
   event_type: string;
@@ -262,6 +283,32 @@ export async function deleteOpenAiApiKey(): Promise<void> {
   });
   handle401(response, true);
   if (!response.ok) throw new Error(await parseFastApiError(response));
+}
+
+export async function fetchCoachSettings(): Promise<CoachSettings> {
+  return getJson<CoachSettings>("/ui/coach/settings");
+}
+
+export async function updateCoachSettings(input: CoachSettingsUpdate): Promise<CoachSettings> {
+  const response = await fetch(`${API_BASE}/ui/coach/settings`, {
+    ...FETCH_OPTS,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(await parseFastApiError(response));
+  return (await response.json()) as CoachSettings;
+}
+
+export async function createCoachLinkCode(): Promise<CoachLinkCodeResponse> {
+  const response = await fetch(`${API_BASE}/ui/coach/link-code`, {
+    ...FETCH_OPTS,
+    method: "POST"
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(await parseFastApiError(response));
+  return (await response.json()) as CoachLinkCodeResponse;
 }
 
 export async function fetchSummary(): Promise<Summary> {

@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
+  CoachSettings,
   McpApiKey,
   OpenAiApiKeyStatus,
   Status,
+  createCoachLinkCode,
   createMcpApiKey,
   deleteOpenAiApiKey,
   disconnectStrava,
+  fetchCoachSettings,
   fetchMcpApiKeys,
   fetchOpenAiApiKeyStatus,
   revokeMcpApiKey,
   saveOpenAiApiKey,
+  updateCoachSettings,
   updateSettings
 } from "../lib/api";
 import { formatUserDateTime } from "../lib/datetimeDisplay";
@@ -116,6 +121,12 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
   const [openAiSaving, setOpenAiSaving] = useState(false);
   const [openAiDeleteOpen, setOpenAiDeleteOpen] = useState(false);
   const [openAiDeleteBusy, setOpenAiDeleteBusy] = useState(false);
+  const [coachSettings, setCoachSettings] = useState<CoachSettings | null>(null);
+  const [coachLoading, setCoachLoading] = useState(true);
+  const [coachSaving, setCoachSaving] = useState(false);
+  const [coachLinkBusy, setCoachLinkBusy] = useState(false);
+  const [coachLinkCode, setCoachLinkCode] = useState<string | null>(null);
+  const [coachLinkExpirySeconds, setCoachLinkExpirySeconds] = useState<number | null>(null);
 
   useEffect(() => {
     fetchMcpApiKeys()
@@ -128,6 +139,13 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
       .then(setOpenAiStatus)
       .catch((err) => setMessage(err instanceof Error ? err.message : "Failed to load OpenAI settings"))
       .finally(() => setOpenAiLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchCoachSettings()
+      .then(setCoachSettings)
+      .catch((err) => setMessage(err instanceof Error ? err.message : "Failed to load coach settings"))
+      .finally(() => setCoachLoading(false));
   }, []);
 
   const handleToggle = async (key: "run_shoe_enabled" | "gym_hide_enabled", value: boolean) => {
@@ -203,6 +221,39 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
       setMessage(err instanceof Error ? err.message : "Failed to remove OpenAI key");
     } finally {
       setOpenAiDeleteBusy(false);
+    }
+  };
+
+  const handleSaveCoachSettings = async () => {
+    if (!coachSettings) return;
+    setCoachSaving(true);
+    try {
+      const next = await updateCoachSettings({
+        vector_store_id: coachSettings.vector_store_id,
+        agent_name: coachSettings.agent_name,
+        agent_instructions: coachSettings.agent_instructions,
+        openai_model: coachSettings.openai_model
+      });
+      setCoachSettings(next);
+      setMessage(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to save coach settings");
+    } finally {
+      setCoachSaving(false);
+    }
+  };
+
+  const handleGenerateCoachLinkCode = async () => {
+    setCoachLinkBusy(true);
+    try {
+      const res = await createCoachLinkCode();
+      setCoachLinkCode(res.code);
+      setCoachLinkExpirySeconds(res.expires_in_seconds);
+      setMessage(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to generate link code");
+    } finally {
+      setCoachLinkBusy(false);
     }
   };
 
@@ -310,6 +361,132 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
                 {openAiSaving ? "Saving…" : "Save key"}
               </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Coach bot */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
+        <div className="px-5 py-4">
+          <h2 className="text-sm font-semibold text-gray-900">Coach bot</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Configure your Telegram coaching assistant. Pick the knowledge base from{" "}
+            <Link to="/vector-store" className="text-orange-600 hover:text-orange-700 underline">
+              Vector stores
+            </Link>
+            .
+          </p>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          {coachLoading || !coachSettings ? (
+            <p className="text-xs text-gray-500">Loading…</p>
+          ) : (
+            <>
+              <div className="grid gap-3">
+                <label className="text-xs font-medium text-gray-700">
+                  Agent name
+                  <input
+                    type="text"
+                    value={coachSettings.agent_name}
+                    onChange={(e) =>
+                      setCoachSettings((prev) =>
+                        prev ? { ...prev, agent_name: e.target.value } : prev
+                      )
+                    }
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Coach"
+                  />
+                </label>
+                <label className="text-xs font-medium text-gray-700">
+                  OpenAI model
+                  <input
+                    type="text"
+                    value={coachSettings.openai_model}
+                    onChange={(e) =>
+                      setCoachSettings((prev) =>
+                        prev ? { ...prev, openai_model: e.target.value } : prev
+                      )
+                    }
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                    placeholder="gpt-4.1-mini"
+                  />
+                </label>
+                <label className="text-xs font-medium text-gray-700">
+                  Vector store ID
+                  <input
+                    type="text"
+                    value={coachSettings.vector_store_id ?? ""}
+                    onChange={(e) =>
+                      setCoachSettings((prev) =>
+                        prev ? { ...prev, vector_store_id: e.target.value || null } : prev
+                      )
+                    }
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                    placeholder="vs_..."
+                  />
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Select a store on the Vector stores page to set this quickly.
+                  </p>
+                </label>
+                <label className="text-xs font-medium text-gray-700">
+                  Agent instructions
+                  <textarea
+                    value={coachSettings.agent_instructions}
+                    onChange={(e) =>
+                      setCoachSettings((prev) =>
+                        prev ? { ...prev, agent_instructions: e.target.value } : prev
+                      )
+                    }
+                    className="mt-1 min-h-28 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="How should the coach respond?"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleSaveCoachSettings()}
+                  disabled={coachSaving}
+                  className="px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 disabled:opacity-50"
+                >
+                  {coachSaving ? "Saving…" : "Save coach settings"}
+                </button>
+                <Link
+                  to="/vector-store"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Open Vector stores
+                </Link>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-2">
+                <p className="text-xs font-medium text-gray-800">
+                  Telegram link: {coachSettings.telegram_linked ? "Linked" : "Not linked"}
+                </p>
+                {coachSettings.telegram_linked && coachSettings.telegram_user_id != null && (
+                  <p className="text-xs text-gray-600">Linked Telegram user ID: {coachSettings.telegram_user_id}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateCoachLinkCode()}
+                  disabled={coachLinkBusy}
+                  className="px-3 py-1.5 text-xs font-medium text-orange-700 bg-white border border-orange-200 rounded-md hover:bg-orange-50 disabled:opacity-50"
+                >
+                  {coachLinkBusy ? "Generating…" : "Generate link code"}
+                </button>
+                {coachLinkCode && (
+                  <div className="rounded border border-orange-200 bg-orange-50 px-2 py-2">
+                    <p className="text-xs text-orange-900">
+                      Send to your coach bot: <code className="font-mono">/start {coachLinkCode}</code>
+                    </p>
+                    {coachLinkExpirySeconds != null && (
+                      <p className="text-[11px] text-orange-800 mt-1">
+                        Expires in {coachLinkExpirySeconds} seconds.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = ""
     telegram_allowed_user_id: int = 0
     telegram_webhook_url: str = ""
+    coach_telegram_bot_token: str = ""
+    coach_telegram_webhook_secret: str = ""
+    coach_telegram_allowed_user_id: int = 0
+    coach_telegram_webhook_url: str = ""
+    coach_conversation_history_user_turn_limit: int = 20
+    coach_link_code_ttl_seconds: int = 600
+
+    redis_url: str = "redis://redis:6379/0"
+    mcp_server_url: str = ""
+    strava_mcp_bearer: str = ""
 
     app_secret_key: str = ""
     jwt_secret: str = ""
