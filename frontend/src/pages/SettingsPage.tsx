@@ -465,25 +465,29 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
                 {coachSettings.telegram_linked && coachSettings.telegram_user_id != null && (
                   <p className="text-xs text-gray-600">Linked Telegram user ID: {coachSettings.telegram_user_id}</p>
                 )}
-                <button
-                  type="button"
-                  onClick={() => void handleGenerateCoachLinkCode()}
-                  disabled={coachLinkBusy}
-                  className="px-3 py-1.5 text-xs font-medium text-orange-700 bg-white border border-orange-200 rounded-md hover:bg-orange-50 disabled:opacity-50"
-                >
-                  {coachLinkBusy ? "Generating…" : "Generate link code"}
-                </button>
-                {coachLinkCode && (
-                  <div className="rounded border border-orange-200 bg-orange-50 px-2 py-2">
-                    <p className="text-xs text-orange-900">
-                      Send to your coach bot: <code className="font-mono">/start {coachLinkCode}</code>
-                    </p>
-                    {coachLinkExpirySeconds != null && (
-                      <p className="text-[11px] text-orange-800 mt-1">
-                        Expires in {coachLinkExpirySeconds} seconds.
-                      </p>
+                {!coachSettings.telegram_linked && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleGenerateCoachLinkCode()}
+                      disabled={coachLinkBusy}
+                      className="px-3 py-1.5 text-xs font-medium text-orange-700 bg-white border border-orange-200 rounded-md hover:bg-orange-50 disabled:opacity-50"
+                    >
+                      {coachLinkBusy ? "Generating…" : "Generate link code"}
+                    </button>
+                    {coachLinkCode && (
+                      <div className="rounded border border-orange-200 bg-orange-50 px-2 py-2">
+                        <p className="text-xs text-orange-900">
+                          Send to your coach bot: <code className="font-mono">/start {coachLinkCode}</code>
+                        </p>
+                        {coachLinkExpirySeconds != null && (
+                          <p className="text-[11px] text-orange-800 mt-1">
+                            Expires in {coachLinkExpirySeconds} seconds.
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             </>
