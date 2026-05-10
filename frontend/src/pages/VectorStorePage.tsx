@@ -4,6 +4,7 @@ import {
   VectorStore,
   VectorStoreFileRow,
   createVectorStore,
+  deleteVectorStore,
   deleteVectorStoreFile,
   fetchVectorStore,
   fetchVectorStoreFiles,
@@ -43,6 +44,7 @@ export function VectorStorePage() {
   const [newStoreName, setNewStoreName] = useState("");
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deletingStore, setDeletingStore] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadStores = useCallback(async () => {
@@ -155,6 +157,33 @@ export function VectorStorePage() {
       await loadStores();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Remove failed");
+    }
+  };
+
+  const onDeleteStore = async () => {
+    if (!selectedId || !selectedDetail) return;
+    const label = selectedDetail.name?.trim() || selectedDetail.id;
+    if (
+      !window.confirm(
+        `Delete vector store "${label}" (${selectedDetail.id})?\n\nThis removes the store and its file links in OpenAI. Uploaded files may still exist in your OpenAI project until removed separately. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingStore(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await deleteVectorStore(selectedId);
+      setSelectedId(null);
+      setSelectedDetail(null);
+      setFiles([]);
+      setMessage("Vector store deleted");
+      await loadStores();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete store failed");
+    } finally {
+      setDeletingStore(false);
     }
   };
 
@@ -271,6 +300,22 @@ export function VectorStorePage() {
                   </dl>
                 )}
 
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => void onDeleteStore()}
+                    disabled={deletingStore}
+                    className="text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+                  >
+                    {deletingStore ? "Deleting…" : "Delete vector store"}
+                  </button>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Permanently removes this store in OpenAI. Update{" "}
+                    <code className="text-[11px] bg-gray-100 px-1 rounded">VECTOR_STORE_ID</code> if
+                    your agent used this store.
+                  </p>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     ref={fileInputRef}
@@ -282,7 +327,7 @@ export function VectorStorePage() {
                   <button
                     type="button"
                     onClick={onPickFile}
-                    disabled={uploading}
+                    disabled={uploading || deletingStore}
                     className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     {uploading ? "Uploading…" : "Upload PDF or Markdown"}
@@ -322,7 +367,8 @@ export function VectorStorePage() {
                               <button
                                 type="button"
                                 onClick={() => void onRemoveFile(row)}
-                                className="text-red-600 hover:text-red-800 text-xs font-medium"
+                                disabled={deletingStore}
+                                className="text-red-600 hover:text-red-800 text-xs font-medium disabled:opacity-50"
                               >
                                 Remove
                               </button>

@@ -137,3 +137,13 @@ def delete_vector_store_file(
 ) -> dict:
     _exec_openai(lambda: service.remove_file_from_store(vector_store_id, file_id))
     return {"ok": True}
+
+
+@router.delete("/vector-stores/{vector_store_id}")
+def delete_vector_store(
+    vector_store_id: str,
+    _user: User = Depends(require_jwt_user),
+    service: OpenAIVectorStoreService = Depends(_vector_store_service),
+) -> dict:
+    _exec_openai(lambda: service.delete_vector_store(vector_store_id))
+    return {"ok": True}

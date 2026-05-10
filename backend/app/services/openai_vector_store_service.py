@@ -71,6 +71,9 @@ class OpenAIVectorStoreService:
         vs = self._client.vector_stores.retrieve(vector_store_id)
         return self._serialize_vector_store(vs)
 
+    def delete_vector_store(self, vector_store_id: str) -> None:
+        self._client.vector_stores.delete(vector_store_id)
+
     def list_vector_store_files(
         self,
         vector_store_id: str,

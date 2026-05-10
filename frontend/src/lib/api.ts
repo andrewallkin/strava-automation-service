@@ -508,6 +508,18 @@ export async function fetchVectorStore(vectorStoreId: string): Promise<VectorSto
   return (await response.json()) as VectorStore;
 }
 
+export async function deleteVectorStore(vectorStoreId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}`,
+    {
+      ...FETCH_OPTS,
+      method: "DELETE"
+    }
+  );
+  handle401(response, true);
+  if (!response.ok) throw new Error(await readUiErrorMessage(response));
+}
+
 export async function fetchVectorStoreFiles(
   vectorStoreId: string,
   params?: { limit?: number; after?: string | null }
