@@ -107,7 +107,7 @@ async def coach_telegram_webhook(
     if not user:
         telegram.send_message(
             chat_id,
-            "Your Telegram account is not linked yet. Generate a link code in Settings and send /start <code>.",
+            "Your Telegram account is not linked yet. Generate a link code in Settings and send /start followed by your code.",
         )
         return {"status": "ignored", "reason": "telegram user not linked"}
 
@@ -140,6 +140,6 @@ async def coach_telegram_webhook(
     log.info("Persisting updated conversation history for app_user_id=%s", user.id)
     history_store.append_history(user.id, new_items, turn_limit)
     log.info("Sending coach response to Telegram for app_user_id=%s chat_id=%s", user.id, chat_id)
-    telegram.send_message(chat_id, reply_text)
+    telegram.send_message(chat_id, reply_text, content_is_markup=True)
     log.info("Coach webhook flow completed successfully for app_user_id=%s", user.id)
     return {"status": "ok"}

@@ -144,6 +144,6 @@ def test_coach_webhook_message_uses_history_and_sends_reply() -> None:
                     [{"role": "user"}, {"type": "message", "role": "assistant"}],
                     20,
                 )
-                mock_send.assert_called_with(12345, "Nice session.")
+                mock_send.assert_called_with(12345, "Nice session.", content_is_markup=True)
     finally:
         app.dependency_overrides.pop(get_db, None)

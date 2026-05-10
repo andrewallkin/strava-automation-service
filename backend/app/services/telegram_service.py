@@ -1,6 +1,7 @@
 import httpx
 
 from app.config import get_settings
+from app.services.telegram_markdown import MARKDOWN_V2, escape_markdown_v2
 from app.time_formatting import format_moving_time_s
 
 TELEGRAM_BASE_URL = "https://api.telegram.org"
@@ -56,11 +57,13 @@ class TelegramService:
             ]
             for shoe in shoes
         ]
+        outbound = escape_markdown_v2(text)
         resp = httpx.post(
             f"{self.base_url}/sendMessage",
             json={
                 "chat_id": chat_id,
-                "text": text,
+                "text": outbound,
+                "parse_mode": MARKDOWN_V2,
                 "reply_markup": {"inline_keyboard": keyboard},
             },
             timeout=20,
@@ -68,16 +71,21 @@ class TelegramService:
         resp.raise_for_status()
         return int(resp.json()["result"]["message_id"])
 
-    def send_message(self, chat_id: int, text: str) -> None:
+    def send_message(self, chat_id: int, text: str, *, content_is_markup: bool = False) -> None:
+        outbound = text if content_is_markup else escape_markdown_v2(text)
         httpx.post(
             f"{self.base_url}/sendMessage",
-            json={"chat_id": chat_id, "text": text},
+            json={"chat_id": chat_id, "text": outbound, "parse_mode": MARKDOWN_V2},
             timeout=20,
         ).raise_for_status()
 
     def answer_callback(self, callback_query_id: str, text: str = "Saved") -> None:
         httpx.post(
             f"{self.base_url}/answerCallbackQuery",
-            json={"callback_query_id": callback_query_id, "text": text},
+            json={
+                "callback_query_id": callback_query_id,
+                "text": escape_markdown_v2(text),
+                "parse_mode": MARKDOWN_V2,
+            },
             timeout=20,
         ).raise_for_status()
