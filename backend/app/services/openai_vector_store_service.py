@@ -124,9 +124,9 @@ class OpenAIVectorStoreService:
             vector_store_id, vsf, filename_hint=file_resp.filename or filename
         )
 
-    def detach_file_from_vector_store(self, vector_store_id: str, file_id: str) -> None:
-        """Remove the file from the vector store only (does not delete the OpenAI file object)."""
-        self._client.vector_stores.files.delete(
+    def detach_file_from_vector_store(self, vector_store_id: str, file_id: str) -> Any:
+        """Remove one attachment from the vector store only (does not delete the OpenAI file object)."""
+        return self._client.vector_stores.files.delete(
             vector_store_id=vector_store_id,
             file_id=file_id,
         )
@@ -140,10 +140,38 @@ class OpenAIVectorStoreService:
                 return
             raise
 
+    def _resolve_store_and_openai_file_ids(
+        self, vector_store_id: str, target_id: str
+    ) -> tuple[str, str | None]:
+        """
+        Resolve both identifiers needed for deletion:
+        - vector_store_file_id: identifier accepted by vector_stores.files.delete(...)
+        - openai_file_id: identifier accepted by files.delete(...)
+        """
+        page = self._client.vector_stores.files.list(vector_store_id=vector_store_id, limit=100)
+        for vsf in page.data:
+            vector_store_file_id = getattr(vsf, "id", None)
+            openai_file_id = getattr(vsf, "file_id", None)
+            if vector_store_file_id == target_id or openai_file_id == target_id:
+                if vector_store_file_id is None:
+                    raise ValueError("Vector store file id is missing from OpenAI response.")
+                if openai_file_id is None and isinstance(vector_store_file_id, str):
+                    # Some SDK versions expose file IDs directly as `id` on this object.
+                    if vector_store_file_id.startswith("file-"):
+                        openai_file_id = vector_store_file_id
+                return str(vector_store_file_id), str(openai_file_id) if openai_file_id else None
+        return target_id, target_id if target_id.startswith("file-") else None
+
     def remove_file_from_store(self, vector_store_id: str, file_id: str) -> None:
-        """Detach from the store first, then delete the underlying file — two separate API steps."""
-        self.detach_file_from_vector_store(vector_store_id, file_id)
-        self.delete_openai_file(file_id)
+        """Detach from store first, then delete underlying OpenAI file when known."""
+        vector_store_file_id, openai_file_id = self._resolve_store_and_openai_file_ids(
+            vector_store_id, file_id
+        )
+        detach_resp = self.detach_file_from_vector_store(vector_store_id, vector_store_file_id)
+        if hasattr(detach_resp, "deleted") and getattr(detach_resp, "deleted") is False:
+            raise ValueError("OpenAI did not detach the file from the vector store.")
+        if openai_file_id:
+            self.delete_openai_file(openai_file_id)
 
     def _serialize_vector_store(self, vs: Any) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -167,7 +195,13 @@ class OpenAIVectorStoreService:
         vsf: Any,
         filename_hint: str | None = None,
     ) -> dict[str, Any]:
-        file_id = getattr(vsf, "id", None)
+        vector_store_file_id = getattr(vsf, "id", None)
+        file_id = getattr(vsf, "file_id", None)
+        if file_id is None and isinstance(vector_store_file_id, str):
+            if vector_store_file_id.startswith("file-"):
+                file_id = vector_store_file_id
+        if file_id is None and vector_store_file_id is not None:
+            file_id = str(vector_store_file_id)
         filename = filename_hint
         if filename is None and file_id:
             try:
@@ -177,6 +211,7 @@ class OpenAIVectorStoreService:
                 logger.debug("Could not retrieve file metadata for %s", file_id)
         return {
             "file_id": file_id,
+            "vector_store_file_id": vector_store_file_id,
             "vector_store_id": vector_store_id,
             "status": getattr(vsf, "status", None),
             "created_at": getattr(vsf, "created_at", None),
