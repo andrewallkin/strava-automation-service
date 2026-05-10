@@ -222,7 +222,10 @@ export async function updateSettings(settings: SettingsUpdate): Promise<Status> 
 }
 
 export async function fetchMcpApiKeys(): Promise<McpApiKey[]> {
-  return getJson<McpApiKey[]>("/ui/mcp-api-keys");
+  const response = await fetch(`${API_BASE}/ui/mcp-api-keys`, NO_STORE_FETCH);
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return (await response.json()) as McpApiKey[];
 }
 
 export async function createMcpApiKey(name?: string): Promise<McpApiKey> {
