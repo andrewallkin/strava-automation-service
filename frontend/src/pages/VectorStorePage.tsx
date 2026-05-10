@@ -192,7 +192,9 @@ export function VectorStorePage() {
     setMessage(null);
     try {
       if (pendingConfirm.type === "removeFile") {
-        await deleteVectorStoreFile(selectedId, pendingConfirm.row.file_id);
+        const removedFileId = pendingConfirm.row.file_id;
+        await deleteVectorStoreFile(selectedId, removedFileId);
+        setFiles((prev) => prev.filter((r) => r.file_id !== removedFileId));
         setMessage("File removed");
         await loadSelected(selectedId);
         await loadStores();

@@ -2,6 +2,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 const FETCH_OPTS: RequestInit = { credentials: "include" };
 
+/** Dynamic UI data must not use the HTTP cache (GET after DELETE can otherwise look stale). */
+const NO_STORE_FETCH: RequestInit = { ...FETCH_OPTS, cache: "no-store" };
+
 function handle401(response: Response, redirectOn401: boolean): void {
   if (response.status === 401) {
     if (redirectOn401) {
@@ -525,7 +528,7 @@ export async function fetchVectorStores(params?: {
   if (params?.limit != null) sp.set("limit", String(params.limit));
   if (params?.after) sp.set("after", params.after);
   const q = sp.toString();
-  const response = await fetch(`${API_BASE}/ui/vector-stores${q ? `?${q}` : ""}`, FETCH_OPTS);
+  const response = await fetch(`${API_BASE}/ui/vector-stores${q ? `?${q}` : ""}`, NO_STORE_FETCH);
   handle401(response, true);
   if (!response.ok) throw new Error(await readUiErrorMessage(response));
   return (await response.json()) as VectorStoreListResponse;
@@ -546,7 +549,7 @@ export async function createVectorStore(name?: string | null): Promise<VectorSto
 export async function fetchVectorStore(vectorStoreId: string): Promise<VectorStore> {
   const response = await fetch(
     `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}`,
-    FETCH_OPTS
+    NO_STORE_FETCH
   );
   handle401(response, true);
   if (!response.ok) throw new Error(await readUiErrorMessage(response));
@@ -575,7 +578,7 @@ export async function fetchVectorStoreFiles(
   const q = sp.toString();
   const response = await fetch(
     `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}/files${q ? `?${q}` : ""}`,
-    FETCH_OPTS
+    NO_STORE_FETCH
   );
   handle401(response, true);
   if (!response.ok) throw new Error(await readUiErrorMessage(response));

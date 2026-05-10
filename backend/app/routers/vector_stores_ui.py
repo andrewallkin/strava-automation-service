@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,8 @@ from app.services.openai_vector_store_service import (
 router = APIRouter(prefix="/api/ui", tags=["ui-vector-stores"])
 
 _MAX_LIST_LIMIT = 100
+
+_NO_STORE_CACHE = "no-store"
 
 
 def _vector_store_service(
@@ -51,11 +53,13 @@ class VectorStoreCreateBody(BaseModel):
 
 @router.get("/vector-stores")
 def list_vector_stores(
+    response: Response,
     limit: Annotated[int, Query(ge=1, le=_MAX_LIST_LIMIT)] = 20,
     after: str | None = None,
     _user: User = Depends(require_jwt_user),
     service: OpenAIVectorStoreService = Depends(_vector_store_service),
 ) -> dict:
+    response.headers["Cache-Control"] = _NO_STORE_CACHE
     return _exec_openai(lambda: service.list_vector_stores(limit=limit, after=after))
 
 
@@ -71,21 +75,25 @@ def create_vector_store(
 
 @router.get("/vector-stores/{vector_store_id}")
 def get_vector_store(
+    response: Response,
     vector_store_id: str,
     _user: User = Depends(require_jwt_user),
     service: OpenAIVectorStoreService = Depends(_vector_store_service),
 ) -> dict:
+    response.headers["Cache-Control"] = _NO_STORE_CACHE
     return _exec_openai(lambda: service.retrieve_vector_store(vector_store_id))
 
 
 @router.get("/vector-stores/{vector_store_id}/files")
 def list_vector_store_files(
+    response: Response,
     vector_store_id: str,
     limit: Annotated[int, Query(ge=1, le=_MAX_LIST_LIMIT)] = 50,
     after: str | None = None,
     _user: User = Depends(require_jwt_user),
     service: OpenAIVectorStoreService = Depends(_vector_store_service),
 ) -> dict:
+    response.headers["Cache-Control"] = _NO_STORE_CACHE
     return _exec_openai(
         lambda: service.list_vector_store_files(vector_store_id, limit=limit, after=after)
     )

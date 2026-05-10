@@ -124,17 +124,26 @@ class OpenAIVectorStoreService:
             vector_store_id, vsf, filename_hint=file_resp.filename or filename
         )
 
-    def remove_file_from_store(self, vector_store_id: str, file_id: str) -> None:
+    def detach_file_from_vector_store(self, vector_store_id: str, file_id: str) -> None:
+        """Remove the file from the vector store only (does not delete the OpenAI file object)."""
         self._client.vector_stores.files.delete(
             vector_store_id=vector_store_id,
             file_id=file_id,
         )
+
+    def delete_openai_file(self, file_id: str) -> None:
+        """Delete the uploaded file object from OpenAI storage (404 = already gone)."""
         try:
             self._client.files.delete(file_id)
         except APIStatusError as e:
             if getattr(e, "status_code", None) == 404:
                 return
             raise
+
+    def remove_file_from_store(self, vector_store_id: str, file_id: str) -> None:
+        """Detach from the store first, then delete the underlying file — two separate API steps."""
+        self.detach_file_from_vector_store(vector_store_id, file_id)
+        self.delete_openai_file(file_id)
 
     def _serialize_vector_store(self, vs: Any) -> dict[str, Any]:
         out: dict[str, Any] = {
