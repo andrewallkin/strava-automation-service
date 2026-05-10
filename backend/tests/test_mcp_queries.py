@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
@@ -14,6 +15,7 @@ from app.models import (
     StravaActivitySplit,
     User,
 )
+from app.services.coach_openai_service import ALLOWED_MCP_TOOLS
 
 
 def _activity(activity_id: int, athlete_id: int, deleted: bool = False) -> StravaActivity:
@@ -86,9 +88,26 @@ def test_catalog_registration_replaces_poc_tools_and_includes_expanded_schema_to
     assert hasattr(server, "search_activities")
     assert hasattr(server, "get_activity_summary")
     assert hasattr(server, "get_athlete_profile")
+    assert hasattr(server, "get_current_date")
     assert hasattr(server, "get_shoe_mileage")
     assert hasattr(server, "get_athlete_stats")
     assert SKIPPED_MCP_TOOLS == {}
+
+
+def test_current_date_formatter_uses_requested_natural_language_format() -> None:
+    value = datetime(2026, 5, 10, tzinfo=UTC)
+
+    assert server._format_current_date(value) == "Sunday 10 May 2026"
+
+
+def test_get_current_date_returns_natural_language_date() -> None:
+    output = server.get_current_date()
+
+    assert re.fullmatch(r"[A-Z][a-z]+ [1-9][0-9]? [A-Z][a-z]+ \d{4}", output)
+
+
+def test_coach_agent_allows_current_date_mcp_tool() -> None:
+    assert "get_current_date" in ALLOWED_MCP_TOOLS
 
 
 def test_classify_workout_type_detects_intervals_from_lap_structure(monkeypatch) -> None:

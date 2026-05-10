@@ -43,6 +43,7 @@ def make_user_input_item(text: str) -> dict[str, Any]:
 ALLOWED_MCP_TOOLS = [
     "get_athlete_profile",
     "get_heart_rate_zones",
+    "get_current_date",
     "search_activities",
     "list_recent_runs",
     "find_activity_by_date",

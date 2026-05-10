@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.debug import DebugTokenVerifier
@@ -35,6 +37,25 @@ def _run_tool(operation: Callable[..., str], **kwargs: object) -> str:
     except Exception:
         log.exception("MCP tool failed | tool=%s", getattr(operation, "__name__", "unknown"))
         return "Unable to complete the request due to an internal service error."
+
+
+def _configured_timezone() -> ZoneInfo | timezone:
+    settings = get_settings()
+    try:
+        return ZoneInfo(settings.timezone)
+    except ZoneInfoNotFoundError:
+        log.warning("Invalid timezone configured for MCP date helper: %s", settings.timezone)
+        return timezone.utc
+
+
+def _format_current_date(value: datetime) -> str:
+    return f"{value:%A} {value.day} {value:%B %Y}"
+
+
+@mcp.tool()
+def get_current_date() -> str:
+    """Return today's date in the configured application timezone."""
+    return _format_current_date(datetime.now(_configured_timezone()))
 
 
 @mcp.tool()
