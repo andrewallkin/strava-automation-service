@@ -12,6 +12,11 @@ from app.deps import require_jwt_user
 from app.models import EventLog, PendingActivity, User
 from app.services.activity_service import include_gear_in_shoe_vault, list_gear
 from app.services.mcp_api_key_service import create_mcp_api_key, list_mcp_api_keys, revoke_mcp_api_key
+from app.services.openai_credential_service import (
+    delete_openai_api_key,
+    get_openai_credential_status,
+    save_openai_api_key,
+)
 from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
 
@@ -25,6 +30,10 @@ class SettingsUpdate(BaseModel):
 
 class McpApiKeyCreate(BaseModel):
     name: str | None = None
+
+
+class OpenAiApiKeyBody(BaseModel):
+    api_key: str
 
 
 class StravaExplorerRequest(BaseModel):
@@ -130,6 +139,46 @@ def revoke_mcp_key(
     if not revoke_mcp_api_key(db, user, key_id):
         raise HTTPException(status_code=404, detail="MCP API key not found")
     return {"revoked": True}
+
+
+@router.get("/openai-api-key")
+def openai_api_key_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    configured, key_prefix, updated_at = get_openai_credential_status(db, user)
+    return {
+        "configured": configured,
+        "key_prefix": key_prefix,
+        "updated_at": updated_at.isoformat() if updated_at else None,
+    }
+
+
+@router.put("/openai-api-key")
+def openai_api_key_put(
+    body: OpenAiApiKeyBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    try:
+        save_openai_api_key(db, user, body.api_key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    configured, key_prefix, updated_at = get_openai_credential_status(db, user)
+    return {
+        "configured": configured,
+        "key_prefix": key_prefix,
+        "updated_at": updated_at.isoformat() if updated_at else None,
+    }
+
+
+@router.delete("/openai-api-key")
+def openai_api_key_delete(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    delete_openai_api_key(db, user)
+    return {"ok": True}
 
 
 @router.get("/summary")

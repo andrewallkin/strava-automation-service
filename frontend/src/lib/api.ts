@@ -133,6 +133,12 @@ export type McpApiKey = {
   api_key?: string;
 };
 
+export type OpenAiApiKeyStatus = {
+  configured: boolean;
+  key_prefix: string | null;
+  updated_at: string | null;
+};
+
 export type EventRow = {
   id: number;
   event_type: string;
@@ -214,6 +220,45 @@ export async function revokeMcpApiKey(id: number): Promise<void> {
   });
   handle401(response, true);
   if (!response.ok) throw new Error(`Revoke failed: ${response.status}`);
+}
+
+export async function fetchOpenAiApiKeyStatus(): Promise<OpenAiApiKeyStatus> {
+  return getJson<OpenAiApiKeyStatus>("/ui/openai-api-key");
+}
+
+async function parseFastApiError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: string | unknown };
+    if (typeof body.detail === "string") return body.detail;
+    if (Array.isArray(body.detail)) {
+      const first = body.detail[0] as { msg?: string } | undefined;
+      if (first && typeof first.msg === "string") return first.msg;
+    }
+  } catch {
+    /* ignore */
+  }
+  return `Request failed: ${response.status}`;
+}
+
+export async function saveOpenAiApiKey(apiKey: string): Promise<OpenAiApiKeyStatus> {
+  const response = await fetch(`${API_BASE}/ui/openai-api-key`, {
+    ...FETCH_OPTS,
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ api_key: apiKey })
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(await parseFastApiError(response));
+  return (await response.json()) as OpenAiApiKeyStatus;
+}
+
+export async function deleteOpenAiApiKey(): Promise<void> {
+  const response = await fetch(`${API_BASE}/ui/openai-api-key`, {
+    ...FETCH_OPTS,
+    method: "DELETE"
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(await parseFastApiError(response));
 }
 
 export async function fetchSummary(): Promise<Summary> {

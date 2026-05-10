@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   McpApiKey,
+  OpenAiApiKeyStatus,
   Status,
   createMcpApiKey,
+  deleteOpenAiApiKey,
   disconnectStrava,
   fetchMcpApiKeys,
+  fetchOpenAiApiKeyStatus,
   revokeMcpApiKey,
+  saveOpenAiApiKey,
   updateSettings
 } from "../lib/api";
 import { formatUserDateTime } from "../lib/datetimeDisplay";
@@ -105,10 +110,24 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
   const [mcpKeyCopyNotice, setMcpKeyCopyNotice] = useState<CopyNotice | null>(null);
   const [mcpConfigCopyNotice, setMcpConfigCopyNotice] = useState<CopyNotice | null>(null);
 
+  const [openAiStatus, setOpenAiStatus] = useState<OpenAiApiKeyStatus | null>(null);
+  const [openAiLoading, setOpenAiLoading] = useState(true);
+  const [openAiKeyInput, setOpenAiKeyInput] = useState("");
+  const [openAiSaving, setOpenAiSaving] = useState(false);
+  const [openAiDeleteOpen, setOpenAiDeleteOpen] = useState(false);
+  const [openAiDeleteBusy, setOpenAiDeleteBusy] = useState(false);
+
   useEffect(() => {
     fetchMcpApiKeys()
       .then(setMcpKeys)
       .catch((err) => setMessage(err instanceof Error ? err.message : "Failed to load MCP keys"));
+  }, []);
+
+  useEffect(() => {
+    fetchOpenAiApiKeyStatus()
+      .then(setOpenAiStatus)
+      .catch((err) => setMessage(err instanceof Error ? err.message : "Failed to load OpenAI settings"))
+      .finally(() => setOpenAiLoading(false));
   }, []);
 
   const handleToggle = async (key: "run_shoe_enabled" | "gym_hide_enabled", value: boolean) => {
@@ -157,6 +176,36 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
 
   const canGenerateMcpKey = mcpKeyName.trim().length > 0;
 
+  const handleSaveOpenAiKey = async () => {
+    const trimmed = openAiKeyInput.trim();
+    if (!trimmed) return;
+    setOpenAiSaving(true);
+    try {
+      const next = await saveOpenAiApiKey(trimmed);
+      setOpenAiStatus(next);
+      setOpenAiKeyInput("");
+      setMessage(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to save OpenAI key");
+    } finally {
+      setOpenAiSaving(false);
+    }
+  };
+
+  const handleConfirmDeleteOpenAi = async () => {
+    setOpenAiDeleteBusy(true);
+    try {
+      await deleteOpenAiApiKey();
+      setOpenAiStatus({ configured: false, key_prefix: null, updated_at: null });
+      setOpenAiDeleteOpen(false);
+      setMessage(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to remove OpenAI key");
+    } finally {
+      setOpenAiDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="w-full space-y-4">
       {message && (
@@ -200,6 +249,68 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
             checked={localStatus.gym_hide_enabled}
             onChange={(val) => handleToggle("gym_hide_enabled", val)}
           />
+        </div>
+      </div>
+
+      {/* OpenAI (vector store) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
+        <div className="px-5 py-4">
+          <h2 className="text-sm font-semibold text-gray-900">OpenAI</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            API key for the Vector store page (file search). Stored encrypted in the database.
+          </p>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          {openAiLoading ? (
+            <p className="text-xs text-gray-500">Loading…</p>
+          ) : openAiStatus?.configured ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-green-200 bg-green-50/80 px-3 py-3">
+                <p className="text-sm font-medium text-green-900">OpenAI API key is saved.</p>
+                {openAiStatus.key_prefix && (
+                  <p className="text-xs text-green-800 mt-2">
+                    <span className="text-green-700">Key </span>
+                    <code className="rounded bg-white px-2 py-0.5 text-gray-800 border border-green-200 font-mono">
+                      {openAiStatus.key_prefix}
+                    </code>
+                  </p>
+                )}
+                {openAiStatus.updated_at && (
+                  <p className="text-xs text-green-800 mt-1">
+                    Updated {formatUserDateTime(openAiStatus.updated_at, true)}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenAiDeleteOpen(true)}
+                className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100"
+              >
+                Delete API key
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="password"
+                value={openAiKeyInput}
+                onChange={(e) => setOpenAiKeyInput(e.target.value)}
+                placeholder="sk-…"
+                autoComplete="off"
+                aria-label="OpenAI API key"
+                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 font-mono"
+              />
+              <button
+                type="button"
+                disabled={openAiSaving || !openAiKeyInput.trim()}
+                onClick={() => void handleSaveOpenAiKey()}
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
+              >
+                {openAiSaving ? "Saving…" : "Save key"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -419,6 +530,18 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
           Disconnect Strava
         </button>
       </div>
+      <ConfirmDialog
+        open={openAiDeleteOpen}
+        title="Delete OpenAI API key?"
+        description="Vector store features will stop working until you add a key again (or set OPENAI_API_KEY locally)."
+        confirmLabel="Delete"
+        variant="danger"
+        loading={openAiDeleteBusy}
+        onCancel={() => {
+          if (!openAiDeleteBusy) setOpenAiDeleteOpen(false);
+        }}
+        onConfirm={handleConfirmDeleteOpenAi}
+      />
     </div>
   );
 }

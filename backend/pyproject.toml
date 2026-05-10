@@ -9,6 +9,7 @@ description = "Docker-only Strava automation service backend"
 requires-python = ">=3.12"
 dependencies = [
   "alembic>=1.14.0",
+  "cryptography>=43.0.0",
   "fastapi>=0.115.0",
   "openai>=1.60.0",
   "fastmcp",

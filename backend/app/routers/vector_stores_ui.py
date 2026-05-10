@@ -2,10 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.db import get_db
 from app.deps import require_jwt_user
 from app.models import User
+from app.services.openai_credential_service import get_openai_api_key_for_user
 from app.services.openai_vector_store_service import (
     MAX_VECTOR_STORE_UPLOAD_BYTES,
     OpenAIVectorStoreService,
@@ -18,14 +20,17 @@ router = APIRouter(prefix="/api/ui", tags=["ui-vector-stores"])
 _MAX_LIST_LIMIT = 100
 
 
-def _vector_store_service() -> OpenAIVectorStoreService:
-    settings = get_settings()
-    if not settings.openai_api_key.strip():
+def _vector_store_service(
+    user: User = Depends(require_jwt_user),
+    db: Session = Depends(get_db),
+) -> OpenAIVectorStoreService:
+    api_key = get_openai_api_key_for_user(db, user)
+    if not api_key:
         raise HTTPException(
             status_code=503,
-            detail="OpenAI is not configured (set OPENAI_API_KEY).",
+            detail="OpenAI is not configured. Add your API key in Settings (or set OPENAI_API_KEY for local dev).",
         )
-    return OpenAIVectorStoreService(settings.openai_api_key)
+    return OpenAIVectorStoreService(api_key)
 
 
 def _exec_openai(fn):
