@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   VECTOR_STORE_MAX_FILE_BYTES,
   VectorStore,
@@ -12,7 +13,14 @@ import {
   uploadVectorStoreFile,
 } from "../lib/api";
 
+type PendingConfirm =
+  | { type: "removeFile"; row: VectorStoreFileRow }
+  | { type: "deleteStore" };
+
 const ALLOWED_EXTENSIONS = new Set([".pdf", ".md", ".markdown"]);
+
+/** Set before full reload after delete; read on next load to show toast. */
+const VECTOR_STORE_DELETED_TOAST_KEY = "strava_vector_store_deleted_toast";
 
 function formatUnix(ts: number | null): string {
   if (ts == null) return "-";
@@ -44,7 +52,8 @@ export function VectorStorePage() {
   const [newStoreName, setNewStoreName] = useState("");
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [deletingStore, setDeletingStore] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadStores = useCallback(async () => {
@@ -64,6 +73,23 @@ export function VectorStorePage() {
   useEffect(() => {
     void loadStores();
   }, [loadStores]);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(VECTOR_STORE_DELETED_TOAST_KEY) === "1") {
+        sessionStorage.removeItem(VECTOR_STORE_DELETED_TOAST_KEY);
+        setMessage("Vector store deleted");
+      }
+    } catch {
+      /* ignore private mode / quota */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!message) return;
+    const t = window.setTimeout(() => setMessage(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [message]);
 
   const loadSelected = useCallback(async (id: string) => {
     setFilesLoading(true);
@@ -145,47 +171,57 @@ export function VectorStorePage() {
     }
   };
 
-  const onRemoveFile = async (row: VectorStoreFileRow) => {
+  const onRemoveFile = (row: VectorStoreFileRow) => {
     if (!selectedId) return;
-    if (!window.confirm(`Remove ${row.filename ?? row.file_id} from this vector store?`)) return;
+    setError(null);
+    setMessage(null);
+    setPendingConfirm({ type: "removeFile", row });
+  };
+
+  const onDeleteStore = () => {
+    if (!selectedId || !selectedDetail) return;
+    setError(null);
+    setMessage(null);
+    setPendingConfirm({ type: "deleteStore" });
+  };
+
+  const runConfirmedAction = async () => {
+    if (!pendingConfirm || !selectedId) return;
+    setConfirmBusy(true);
     setError(null);
     setMessage(null);
     try {
-      await deleteVectorStoreFile(selectedId, row.file_id);
-      setMessage("File removed");
-      await loadSelected(selectedId);
-      await loadStores();
+      if (pendingConfirm.type === "removeFile") {
+        await deleteVectorStoreFile(selectedId, pendingConfirm.row.file_id);
+        setMessage("File removed");
+        await loadSelected(selectedId);
+        await loadStores();
+      } else {
+        await deleteVectorStore(selectedId);
+        try {
+          sessionStorage.setItem(VECTOR_STORE_DELETED_TOAST_KEY, "1");
+        } catch {
+          /* ignore */
+        }
+        setPendingConfirm(null);
+        window.location.reload();
+        return;
+      }
+      setPendingConfirm(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Remove failed");
+      setError(
+        err instanceof Error
+          ? err.message
+          : pendingConfirm.type === "removeFile"
+            ? "Remove failed"
+            : "Delete store failed"
+      );
+    } finally {
+      setConfirmBusy(false);
     }
   };
 
-  const onDeleteStore = async () => {
-    if (!selectedId || !selectedDetail) return;
-    const label = selectedDetail.name?.trim() || selectedDetail.id;
-    if (
-      !window.confirm(
-        `Delete vector store "${label}" (${selectedDetail.id})?\n\nThis removes the store and its file links in OpenAI. Uploaded files may still exist in your OpenAI project until removed separately. This cannot be undone.`
-      )
-    ) {
-      return;
-    }
-    setDeletingStore(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await deleteVectorStore(selectedId);
-      setSelectedId(null);
-      setSelectedDetail(null);
-      setFiles([]);
-      setMessage("Vector store deleted");
-      await loadStores();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete store failed");
-    } finally {
-      setDeletingStore(false);
-    }
-  };
+  const deleteStoreLabel = selectedDetail?.name?.trim() || selectedDetail?.id || "";
 
   return (
     <div className="space-y-6">
@@ -303,11 +339,13 @@ export function VectorStorePage() {
                 <div className="pt-2 border-t border-gray-100">
                   <button
                     type="button"
-                    onClick={() => void onDeleteStore()}
-                    disabled={deletingStore}
+                    onClick={onDeleteStore}
+                    disabled={confirmBusy}
                     className="text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
                   >
-                    {deletingStore ? "Deleting…" : "Delete vector store"}
+                    {confirmBusy && pendingConfirm?.type === "deleteStore"
+                      ? "Deleting…"
+                      : "Delete vector store"}
                   </button>
                   <p className="text-xs text-gray-500 mt-1">
                     Permanently removes this store in OpenAI. Update{" "}
@@ -327,7 +365,7 @@ export function VectorStorePage() {
                   <button
                     type="button"
                     onClick={onPickFile}
-                    disabled={uploading || deletingStore}
+                    disabled={uploading || confirmBusy}
                     className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     {uploading ? "Uploading…" : "Upload PDF or Markdown"}
@@ -366,8 +404,8 @@ export function VectorStorePage() {
                             <td className="px-3 py-2">
                               <button
                                 type="button"
-                                onClick={() => void onRemoveFile(row)}
-                                disabled={deletingStore}
+                                onClick={() => onRemoveFile(row)}
+                                disabled={confirmBusy}
                                 className="text-red-600 hover:text-red-800 text-xs font-medium disabled:opacity-50"
                               >
                                 Remove
@@ -384,6 +422,41 @@ export function VectorStorePage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={
+          pendingConfirm?.type === "removeFile"
+            ? "Remove file from store?"
+            : "Delete vector store?"
+        }
+        description={
+          pendingConfirm?.type === "removeFile" ? (
+            <p>
+              Remove {pendingConfirm.row.filename ?? pendingConfirm.row.file_id} from this vector
+              store?
+            </p>
+          ) : selectedDetail ? (
+            <>
+              <p>
+                Delete vector store &quot;{deleteStoreLabel}&quot; ({selectedDetail.id})?
+              </p>
+              <p>
+                This removes the store and its file links in OpenAI. Uploaded files may still exist
+                in your OpenAI project until removed separately. This cannot be undone.
+              </p>
+            </>
+          ) : null
+        }
+        confirmLabel={pendingConfirm?.type === "removeFile" ? "Remove" : "Delete"}
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={confirmBusy}
+        onCancel={() => {
+          if (!confirmBusy) setPendingConfirm(null);
+        }}
+        onConfirm={() => void runConfirmedAction()}
+      />
     </div>
   );
 }
