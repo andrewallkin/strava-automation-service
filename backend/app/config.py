@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,14 +25,21 @@ class Settings(BaseSettings):
     strava_scopes: str = "activity:read,activity:write,profile:read_all"
     strava_allowed_athlete_id: int = 0  # 0 = no restriction (backward compat)
 
-    telegram_bot_token: str = ""
-    telegram_webhook_secret: str = ""
-    telegram_allowed_user_id: int = 0
-    telegram_webhook_url: str = ""
+    telegram_bot_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("TELEGRAM_BOT_TOKEN", "ACTIVITYADMIN_TELEGRAM_BOT_TOKEN"),
+    )
+    telegram_webhook_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("TELEGRAM_WEBHOOK_SECRET", "ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET"),
+    )
+    telegram_allowed_user_id: int = Field(
+        default=0,
+        validation_alias=AliasChoices("TELEGRAM_ALLOWED_USER_ID", "ACTIVITYADMIN_TELEGRAM_ALLOWED_USER_ID"),
+    )
     coach_telegram_bot_token: str = ""
     coach_telegram_webhook_secret: str = ""
     coach_telegram_allowed_user_id: int = 0
-    coach_telegram_webhook_url: str = ""
     coach_conversation_history_user_turn_limit: int = 20
     coach_link_code_ttl_seconds: int = 600
 
@@ -62,6 +70,22 @@ class Settings(BaseSettings):
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+    @property
+    def _normalized_public_base_url(self) -> str:
+        return self.public_base_url.rstrip("/")
+
+    @property
+    def telegram_webhook_url(self) -> str:
+        if not self.public_base_url or not self.telegram_webhook_secret:
+            return ""
+        return f"{self._normalized_public_base_url}/api/telegram/activityadmin/webhook/{self.telegram_webhook_secret}"
+
+    @property
+    def coach_telegram_webhook_url(self) -> str:
+        if not self.public_base_url or not self.coach_telegram_webhook_secret:
+            return ""
+        return f"{self._normalized_public_base_url}/api/telegram/coach/webhook/{self.coach_telegram_webhook_secret}"
 
 
 @lru_cache

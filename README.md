@@ -25,9 +25,14 @@ Minimum required values:
 - `COACH_TELEGRAM_BOT_TOKEN`
 - `COACH_TELEGRAM_WEBHOOK_SECRET`
 - `COACH_TELEGRAM_ALLOWED_USER_ID`
+- `PUBLIC_BASE_URL`
 - `MCP_SERVER_URL`
 - `STRAVA_MCP_BEARER`
 - `APP_SECRET_KEY`
+
+Telegram webhook URLs are derived automatically from `PUBLIC_BASE_URL`:
+- activity admin bot: `/api/telegram/activityadmin/webhook/{TELEGRAM_WEBHOOK_SECRET}`
+- coach bot: `/api/telegram/coach/webhook/{COACH_TELEGRAM_WEBHOOK_SECRET}`
 
 ## VPS Deployment
 
