@@ -45,6 +45,7 @@ jobs:
           ENV_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           ENV_TELEGRAM_ALLOWED_USER_ID: ${{ secrets.TELEGRAM_ALLOWED_USER_ID }}
           ENV_TELEGRAM_WEBHOOK_URL: ${{ secrets.TELEGRAM_WEBHOOK_URL }}
+          ENV_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           ssh -t -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT }} -o StrictHostKeyChecking=no -o ServerAliveInterval=50 -o ServerAliveCountMax=10 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<EOF
           set -euo pipefail
@@ -103,6 +104,8 @@ jobs:
           TELEGRAM_WEBHOOK_SECRET=${ENV_TELEGRAM_WEBHOOK_SECRET}
           TELEGRAM_ALLOWED_USER_ID=${ENV_TELEGRAM_ALLOWED_USER_ID}
           TELEGRAM_WEBHOOK_URL=${ENV_TELEGRAM_WEBHOOK_URL}
+
+          OPENAI_API_KEY=${ENV_OPENAI_API_KEY}
           EOF_ENV
           echo "✓ Environment configured"
           echo "::endgroup::"
