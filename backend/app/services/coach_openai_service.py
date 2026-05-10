@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from agents import Agent, FileSearchTool, HostedMCPTool, ModelSettings, Runner
@@ -145,7 +146,15 @@ class CoachOpenAIService:
             model_settings=ModelSettings(parallel_tool_calls=False, tool_choice="auto"),
         )
 
-        result = await Runner.run(agent, input=run_input)
+        previous_api_key = os.environ.get("OPENAI_API_KEY")
+        os.environ["OPENAI_API_KEY"] = api_key
+        try:
+            result = await Runner.run(agent, input=run_input)
+        finally:
+            if previous_api_key is None:
+                os.environ.pop("OPENAI_API_KEY", None)
+            else:
+                os.environ["OPENAI_API_KEY"] = previous_api_key
         output_items = [_json_safe(item.to_input_item()) for item in result.new_items]
         response_text = result.final_output_as(str).strip()
         if not response_text:
