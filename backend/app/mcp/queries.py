@@ -24,6 +24,20 @@ from app.mcp.formatting import RUN_SPORT_TYPES
 
 SKIPPED_MCP_TOOLS: dict[str, str] = {}
 
+SPORT_TYPE_ALIASES = {
+    "run": "Run",
+    "running": "Run",
+    "trailrun": "TrailRun",
+    "trail_run": "TrailRun",
+    "trail run": "TrailRun",
+    "treadmillrun": "TreadmillRun",
+    "treadmill_run": "TreadmillRun",
+    "treadmill run": "TreadmillRun",
+    "virtualrun": "VirtualRun",
+    "virtual_run": "VirtualRun",
+    "virtual run": "VirtualRun",
+}
+
 
 def parse_iso_date(value: str | None, field_name: str) -> date | None:
     if not value:
@@ -66,9 +80,14 @@ def bounded_limit(limit: int, default: int = 25, maximum: int = 100) -> int:
 def normalize_sport_types(sport_type: str | Sequence[str] | None, *, default_runs: bool = False) -> list[str]:
     if not sport_type:
         return list(RUN_SPORT_TYPES) if default_runs else []
+
+    def canonicalize(value: str) -> str:
+        stripped = value.strip()
+        return SPORT_TYPE_ALIASES.get(stripped.lower(), stripped)
+
     if isinstance(sport_type, str):
-        return [part.strip() for part in sport_type.split(",") if part.strip()]
-    return [part for part in sport_type if part]
+        return [canonicalize(part) for part in sport_type.split(",") if part.strip()]
+    return [canonicalize(part) for part in sport_type if part]
 
 
 def activity_scope(user: User) -> Select[tuple[StravaActivity]]:

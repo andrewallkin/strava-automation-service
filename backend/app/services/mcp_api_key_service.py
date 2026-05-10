@@ -46,7 +46,7 @@ def list_mcp_api_keys(db: Session, user: User) -> list[McpApiKey]:
     return list(
         db.scalars(
             select(McpApiKey)
-            .where(McpApiKey.user_id == user.id)
+            .where(McpApiKey.user_id == user.id, McpApiKey.revoked_at.is_(None))
             .order_by(McpApiKey.created_at.desc())
         ).all()
     )
@@ -55,11 +55,13 @@ def list_mcp_api_keys(db: Session, user: User) -> list[McpApiKey]:
 def revoke_mcp_api_key(db: Session, user: User, key_id: int) -> bool:
     row = db.scalar(
         select(McpApiKey)
-        .where(McpApiKey.id == key_id, McpApiKey.user_id == user.id, McpApiKey.revoked_at.is_(None))
+        .where(McpApiKey.id == key_id, McpApiKey.user_id == user.id)
         .limit(1)
     )
     if not row:
         return False
+    if row.revoked_at is not None:
+        return True
     row.revoked_at = datetime.now(UTC)
     db.commit()
     return True

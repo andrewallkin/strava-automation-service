@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from app.mcp import analysis, server
 from app.mcp.formatting import format_activity_detail, format_activity_list
-from app.mcp.queries import SKIPPED_MCP_TOOLS, get_user_activity, list_user_activities
+from app.mcp.queries import SKIPPED_MCP_TOOLS, get_user_activity, list_user_activities, normalize_sport_types
 from app.models import (
     AthleteProfile,
     AthleteStats,
@@ -108,6 +108,15 @@ def test_get_current_date_returns_natural_language_date() -> None:
 
 def test_coach_agent_allows_current_date_mcp_tool() -> None:
     assert "get_current_date" in ALLOWED_MCP_TOOLS
+
+
+def test_sport_type_normalization_accepts_lowercase_run_aliases() -> None:
+    assert normalize_sport_types("run") == ["Run"]
+    assert normalize_sport_types("trail run,treadmill_run,VirtualRun") == [
+        "TrailRun",
+        "TreadmillRun",
+        "VirtualRun",
+    ]
 
 
 def test_classify_workout_type_detects_intervals_from_lap_structure(monkeypatch) -> None:
