@@ -14,7 +14,7 @@ from app.services.telegram_service import TelegramService
 
 log = logging.getLogger("telegram")
 
-router = APIRouter(prefix="/api/telegram", tags=["telegram-webhook"])
+router = APIRouter(prefix="/api/telegram/activityadmin", tags=["telegram-webhook"])
 
 
 def _parse_callback_data(raw: str) -> tuple[int, str]:

@@ -19,27 +19,7 @@ import {
   retryActivity
 } from "../lib/api";
 import { formatMovingTime } from "../lib/formatMovingTime";
-
-const DATE_OPTS: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false
-};
-
-function formatDate(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("en-ZA", DATE_OPTS);
-}
-
-/** Strava start_date_local is local time but API incorrectly adds Z. Strip Z so JS parses as local. */
-function formatLocalDate(value: string | null): string {
-  if (!value) return "-";
-  const localStr = value.replace(/Z$/i, "");
-  return new Date(localStr).toLocaleString("en-ZA", DATE_OPTS);
-}
+import { formatStravaLocalDateTime, formatUserDateTime } from "../lib/datetimeDisplay";
 
 function formatEventType(eventType: string): string {
   return eventType
@@ -92,7 +72,7 @@ function ActivityCard({ activity }: { activity: StravaActivity }) {
             {activity.name ?? (isRun ? "Run" : "Workout")}
           </p>
           <p className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
-            {activity.start_date_local ? formatLocalDate(activity.start_date_local) : ""}
+            {activity.start_date_local ? formatStravaLocalDateTime(activity.start_date_local) : ""}
           </p>
         </div>
         {isRun && (distanceKm || duration) && (
@@ -215,7 +195,7 @@ export function StatsGrid({ summary }: { summary: Summary | null }) {
       >
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last automation</p>
         <p className="mt-1 text-xs font-semibold text-gray-900 leading-tight">
-          {formatDate(summary?.last_event_at ?? null)}
+          {formatUserDateTime(summary?.last_event_at ?? null)}
         </p>
       </div>
     </div>
@@ -242,7 +222,7 @@ export function PendingActivities({
             <div key={item.activity_id} className="px-5 py-3 flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-900">Activity #{item.activity_id}</p>
-                <p className="text-xs text-gray-500">{formatDate(item.created_at)}</p>
+                <p className="text-xs text-gray-500">{formatUserDateTime(item.created_at)}</p>
               </div>
               <button
                 type="button"
@@ -290,7 +270,7 @@ export function RecentEvents({ events }: { events: EventRow[] }) {
             <tbody className="divide-y divide-gray-50">
               {events.map((event) => (
                 <tr key={event.id} className="hover:bg-gray-50 text-gray-600">
-                  <td className="px-5 py-2 whitespace-nowrap">{formatDate(event.created_at)}</td>
+                  <td className="px-5 py-2 whitespace-nowrap">{formatUserDateTime(event.created_at)}</td>
                   <td className="px-5 py-2 whitespace-nowrap">{formatEventType(event.event_type)}</td>
                   <td className="px-5 py-2"><StatusBadge status={event.status} /></td>
                   <td className="px-5 py-2">{event.message}</td>
@@ -467,11 +447,11 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
           {data.this_week.days.some((d) => d.count > 0) && (
             <div className="pt-1 border-t border-gray-100">
               {/* Column headers */}
-              <div className="grid grid-cols-[5rem_1fr_3.5rem_3rem_4rem_3rem] gap-x-2 px-1 pb-1 text-[10px] font-medium text-gray-400 uppercase tracking-wide">
+              <div className="grid grid-cols-[5rem_1fr_3.5rem_minmax(6.25rem,max-content)_4rem_3rem] gap-x-2 px-1 pb-1 text-[10px] font-medium text-gray-400 uppercase tracking-wide">
                 <span>Day</span>
                 <span>Activity</span>
                 <span className="text-right">📏 km</span>
-                <span className="text-right">⏱ time</span>
+                <span className="text-right whitespace-nowrap">⏱ time</span>
                 <span className="text-right">⚡ pace</span>
                 <span className="text-right">⛰ elev</span>
               </div>
@@ -480,12 +460,14 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
                   day.activities.map((act, j) => (
                     <div
                       key={`${i}-${j}`}
-                      className="grid grid-cols-[5rem_1fr_3.5rem_3rem_4rem_3rem] gap-x-2 items-center px-1 py-1 rounded-lg bg-gray-50 text-xs"
+                      className="grid grid-cols-[5rem_1fr_3.5rem_minmax(6.25rem,max-content)_4rem_3rem] gap-x-2 items-center px-1 py-1 rounded-lg bg-gray-50 text-xs"
                     >
                       <span className="text-gray-400 font-medium">{FULL_DAY_NAMES[i]}</span>
                       <span className="text-gray-900 font-medium truncate">{act.name}</span>
                       <span className="text-right text-orange-600 font-semibold">{act.km.toFixed(1)}</span>
-                      <span className="text-right text-gray-600">{formatMovingTime(act.moving_time_s)}</span>
+                      <span className="text-right text-gray-600 whitespace-nowrap tabular-nums">
+                        {formatMovingTime(act.moving_time_s)}
+                      </span>
                       <span className="text-right text-blue-600 font-medium">{formatRunPace(act.km, act.moving_time_s)}</span>
                       <span className="text-right text-gray-500">{act.elevation_m > 0 ? `${act.elevation_m}m` : "—"}</span>
                     </div>

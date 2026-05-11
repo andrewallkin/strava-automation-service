@@ -7,10 +7,12 @@ from app.main import app
 
 def test_oauth_callback_rejects_unauthorized_athlete() -> None:
     """When STRAVA_ALLOWED_ATHLETE_ID is set, reject OAuth from other athletes."""
-    with patch("app.services.strava_service.httpx.post") as mock_post:
-        mock_post.return_value = MagicMock()
-        mock_post.return_value.raise_for_status = MagicMock()
-        mock_post.return_value.json.return_value = {
+    with patch("app.services.strava_service.httpx.request") as request:
+        request.return_value = MagicMock()
+        request.return_value.status_code = 200
+        request.return_value.headers = {}
+        request.return_value.raise_for_status = MagicMock()
+        request.return_value.json.return_value = {
             "athlete": {"id": 999999},
             "access_token": "token",
             "refresh_token": "refresh",
@@ -37,7 +39,10 @@ def test_strava_webhook_ignores_unauthorized_owner() -> None:
     mock_settings = MagicMock()
     mock_settings.strava_allowed_athlete_id = 14460791
 
-    with patch("app.routers.strava_webhook.get_settings", return_value=mock_settings):
+    with (
+        patch("app.routers.strava_webhook.get_settings", return_value=mock_settings),
+        patch("app.routers.strava_webhook.log_event"),
+    ):
         client = TestClient(app)
         response = client.post(
             "/api/strava/webhook",

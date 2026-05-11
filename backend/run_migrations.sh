@@ -22,6 +22,9 @@ done
 
 if [ $attempt -eq $max_attempts ]; then
     echo "✗ Database failed to become ready after $max_attempts attempts"
+    echo ""
+    echo "Last Alembic readiness error:"
+    alembic current || true
     exit 1
 fi
 

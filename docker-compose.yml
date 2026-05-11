@@ -1,10 +1,18 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis-data:/data
+    networks: [default]
+
   api:
     build:
       context: ./backend
     ports:
       - "${BACKEND_PORT:-8002}:8000"
-    depends_on: []
+    depends_on:
+      - redis
     env_file:
       - .env
     restart: always
@@ -20,7 +28,24 @@ services:
     restart: always
     networks: [default]
 
+  mcp:
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.mcp.server"]
+    ports:
+      - "${MCP_PORT:-8004}:8000"
+    depends_on:
+      - api
+      - redis
+    env_file:
+      - .env
+    restart: always
+    networks: [default, postgres-net]
+
 networks:
   default:
   postgres-net:
     external: true
+
+volumes:
+  redis-data:

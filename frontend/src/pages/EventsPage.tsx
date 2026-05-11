@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { EventRow, fetchEvents } from "../lib/api";
-
-const DATE_OPTS: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-};
-
-function formatDate(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("en-ZA", DATE_OPTS);
-}
+import { formatUserDateTime } from "../lib/datetimeDisplay";
 
 function formatEventType(eventType: string): string {
   return eventType
@@ -80,7 +67,7 @@ export function EventsPage() {
             <tbody className="divide-y divide-gray-50">
               {events.map((event) => (
                 <tr key={event.id} className="hover:bg-gray-50 text-gray-600">
-                  <td className="px-5 py-2 whitespace-nowrap">{formatDate(event.created_at)}</td>
+                  <td className="px-5 py-2 whitespace-nowrap">{formatUserDateTime(event.created_at)}</td>
                   <td className="px-5 py-2 whitespace-nowrap">{formatEventType(event.event_type)}</td>
                   <td className="px-5 py-2"><StatusBadge status={event.status} /></td>
                   <td className="px-5 py-2">{event.message}</td>
