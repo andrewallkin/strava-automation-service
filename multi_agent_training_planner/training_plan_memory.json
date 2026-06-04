@@ -1,0 +1,540 @@
+{
+  "runs": [
+    {
+      "run_id": "run_e3dcda002bd9",
+      "created_at": "2026-05-11T18:44:50+00:00",
+      "updated_at": "2026-05-11T18:55:15+00:00",
+      "status": "active",
+      "current_stage": "strava_analysis",
+      "date_context": {
+        "plan_build_date": "2026-05-11",
+        "current_date": "2026-05-11",
+        "timezone": "UTC",
+        "planning_start_date": "2026-05-11",
+        "planning_end_date": "2026-07-04",
+        "races": [
+          {
+            "race_name": "Knysna Half Marathon",
+            "race_distance": "21.1 km",
+            "race_date": "2026-07-04",
+            "priority": "A",
+            "days_until_race": 54,
+            "weeks_until_race": 7.7
+          }
+        ],
+        "notes": []
+      },
+      "accumulated_user_input": "I want to train for the Knysna Half Marathon on 4 July 2026. I want to run a sub 1 hour 35 min race. It is quite a hilly race, with the last few km down a VERY steep road. There is about 340m of elevation gain. and 570m of elevation loss, mostly at the end, but it is mostly undulating.\n\nI run between 45 and 60km per week. I can run most days, but 4 per week usually, max 5. I have a non-negotiable of doing a hill training session every Tuesday evening with my running group called Must Love Hills. No injuries or limitations. I am trying to imprve my cadence. It is about 160spm currently.\n\n1. 45-60km 2. 4 or 5 days a week. Only once on the weekend. 3. None\n\n1. 45-60km 2. 4 or 5 days a week. Only once on the weekend. 3. None",
+      "pending_questions": [],
+      "stage_outputs": {
+        "intake": {
+          "athlete_profile": {
+            "athlete_name": null,
+            "age": null,
+            "sex": null,
+            "height": null,
+            "weight": null,
+            "experience_level": "unknown",
+            "years_running_consistently": null,
+            "current_training_consistency": null
+          },
+          "goal_races": [
+            {
+              "race_name": "Knysna Half Marathon",
+              "race_distance": "21.1 km",
+              "race_date": "2026-07-04",
+              "goal_time": "sub 1 hour 35 min",
+              "terrain": "hilly with steep descent",
+              "elevation_profile": "340m gain, 570m loss",
+              "expected_conditions": null,
+              "priority": "A",
+              "goal": null
+            }
+          ],
+          "constraints": {
+            "runs_per_week": 4,
+            "preferred_run_days": [],
+            "preferred_workout_days": [],
+            "preferred_rest_days": [],
+            "unavailable_days": [],
+            "non_negotiables": [
+              "hill training session every Tuesday evening"
+            ],
+            "preferred_long_run_day": null,
+            "max_weekday_duration_minutes": null,
+            "max_weekend_duration_minutes": null,
+            "travel_or_life_constraints": []
+          },
+          "fitness_background": {
+            "current_weekly_distance_km": 52.5,
+            "typical_weekly_distance_km": 52.5,
+            "recent_long_run_km": null,
+            "longest_recent_run_km": null,
+            "recent_race_results": [],
+            "estimated_threshold_pace": null,
+            "estimated_5k_pace": null,
+            "estimated_marathon_pace": null,
+            "easy_pace_or_hr": null
+          },
+          "health_and_preferences": {
+            "current_injuries": [],
+            "recent_injuries": [],
+            "chronic_issues": [],
+            "medical_limitations": [],
+            "sleep_recovery_stress_notes": [],
+            "training_preferences": [],
+            "strength_training": [],
+            "cross_training": [],
+            "planning_philosophy": []
+          },
+          "date_notes": [],
+          "missing_information": [],
+          "assumptions": [
+            "Current weekly distance is estimated at the midpoint of 45-60 km, set to 52.5 km.",
+            "Runs per week is set to 4, with a maximum of 5, based on user input.",
+            "The plan build date is assumed to be the same as the current date: 2026-05-11."
+          ],
+          "human_input": {
+            "required": false,
+            "reason": "",
+            "questions": []
+          },
+          "ready_for_analysis": true
+        }
+      },
+      "records": [
+        "intake_c9c58d7d3ae8",
+        "intake_7dea998508da",
+        "intake_4262f16f0633",
+        "intake_27058ced07a9"
+      ],
+      "final_plan_id": null
+    }
+  ],
+  "records": [
+    {
+      "id": "intake_c9c58d7d3ae8",
+      "run_id": "run_e3dcda002bd9",
+      "stage": "intake",
+      "created_at": "2026-05-11T18:48:17+00:00",
+      "source": {
+        "run_id": "run_e3dcda002bd9",
+        "date_context": {
+          "plan_build_date": "2026-05-11",
+          "current_date": "2026-05-11",
+          "timezone": "UTC",
+          "planning_start_date": "2026-05-11",
+          "planning_end_date": "2026-07-04",
+          "races": [
+            {
+              "race_name": "Knysna Half Marathon",
+              "race_distance": "21.1 km",
+              "race_date": "2026-07-04",
+              "priority": "A",
+              "days_until_race": 54,
+              "weeks_until_race": 7.7
+            }
+          ],
+          "notes": []
+        },
+        "accumulated_user_input": "I want to train for the Knysna Half Marathon on 4 July 2026. I want to run a sub 1 hour 35 min race. It is quite a hilly race, with the last few km down a VERY steep road. There is about 340m of elevation gain. and 570m of elevation loss, mostly at the end, but it is mostly undulating.",
+        "stage_outputs": {},
+        "pending_questions": []
+      },
+      "data": {
+        "athlete_profile": {
+          "athlete_name": null,
+          "age": null,
+          "sex": null,
+          "height": null,
+          "weight": null,
+          "experience_level": "unknown",
+          "years_running_consistently": null,
+          "current_training_consistency": null
+        },
+        "goal_races": [
+          {
+            "race_name": "Knysna Half Marathon",
+            "race_distance": "21.1 km",
+            "race_date": "2026-07-04",
+            "goal_time": "1:35:00",
+            "terrain": "hilly, undulating with steep descent",
+            "elevation_profile": "340m gain, 570m loss",
+            "expected_conditions": null,
+            "priority": "A",
+            "goal": null
+          }
+        ],
+        "constraints": {
+          "runs_per_week": null,
+          "preferred_run_days": [],
+          "preferred_workout_days": [],
+          "preferred_rest_days": [],
+          "unavailable_days": [],
+          "non_negotiables": [],
+          "preferred_long_run_day": null,
+          "max_weekday_duration_minutes": null,
+          "max_weekend_duration_minutes": null,
+          "travel_or_life_constraints": []
+        },
+        "fitness_background": {
+          "current_weekly_distance_km": null,
+          "typical_weekly_distance_km": null,
+          "recent_long_run_km": null,
+          "longest_recent_run_km": null,
+          "recent_race_results": [],
+          "estimated_threshold_pace": null,
+          "estimated_5k_pace": null,
+          "estimated_marathon_pace": null,
+          "easy_pace_or_hr": null
+        },
+        "health_and_preferences": {
+          "current_injuries": [],
+          "recent_injuries": [],
+          "chronic_issues": [],
+          "medical_limitations": [],
+          "sleep_recovery_stress_notes": [],
+          "training_preferences": [],
+          "strength_training": [],
+          "cross_training": [],
+          "planning_philosophy": []
+        },
+        "date_notes": [],
+        "missing_information": [
+          "current training load",
+          "available running days",
+          "schedule constraints",
+          "injury status"
+        ],
+        "assumptions": [],
+        "human_input": {
+          "required": true,
+          "reason": "Critical information is missing for training plan analysis.",
+          "questions": [
+            "What is your current weekly running distance?",
+            "What days are you available to run?",
+            "Do you have any current injuries or limitations?"
+          ]
+        },
+        "ready_for_analysis": false
+      }
+    },
+    {
+      "id": "intake_7dea998508da",
+      "run_id": "run_e3dcda002bd9",
+      "stage": "intake",
+      "created_at": "2026-05-11T18:51:20+00:00",
+      "source": {
+        "run_id": "run_e3dcda002bd9",
+        "date_context": {
+          "plan_build_date": "2026-05-11",
+          "current_date": "2026-05-11",
+          "timezone": "UTC",
+          "planning_start_date": "2026-05-11",
+          "planning_end_date": "2026-07-04",
+          "races": [
+            {
+              "race_name": "Knysna Half Marathon",
+              "race_distance": "21.1 km",
+              "race_date": "2026-07-04",
+              "priority": "A",
+              "days_until_race": 54,
+              "weeks_until_race": 7.7
+            }
+          ],
+          "notes": []
+        },
+        "accumulated_user_input": "I want to train for the Knysna Half Marathon on 4 July 2026. I want to run a sub 1 hour 35 min race. It is quite a hilly race, with the last few km down a VERY steep road. There is about 340m of elevation gain. and 570m of elevation loss, mostly at the end, but it is mostly undulating.\n\nI run between 45 and 60km per week. I can run most days, but 4 per week usually, max 5. I have a non-negotiable of doing a hill training session every Tuesday evening with my running group called Must Love Hills. No injuries or limitations. I am trying to imprve my cadence. It is about 160spm currently.",
+        "stage_outputs": {},
+        "pending_questions": []
+      },
+      "data": {
+        "athlete_profile": {
+          "athlete_name": null,
+          "age": null,
+          "sex": null,
+          "height": null,
+          "weight": null,
+          "experience_level": "unknown",
+          "years_running_consistently": null,
+          "current_training_consistency": null
+        },
+        "goal_races": [
+          {
+            "race_name": "Knysna Half Marathon",
+            "race_distance": "21.1 km",
+            "race_date": "2026-07-04",
+            "goal_time": "sub 1 hour 35 min",
+            "terrain": "hilly",
+            "elevation_profile": "340m gain, 570m loss",
+            "expected_conditions": null,
+            "priority": "A",
+            "goal": null
+          }
+        ],
+        "constraints": {
+          "runs_per_week": 5,
+          "preferred_run_days": [],
+          "preferred_workout_days": [
+            "Tuesday"
+          ],
+          "preferred_rest_days": [],
+          "unavailable_days": [],
+          "non_negotiables": [
+            "hill training session every Tuesday evening"
+          ],
+          "preferred_long_run_day": null,
+          "max_weekday_duration_minutes": null,
+          "max_weekend_duration_minutes": null,
+          "travel_or_life_constraints": []
+        },
+        "fitness_background": {
+          "current_weekly_distance_km": 60.0,
+          "typical_weekly_distance_km": null,
+          "recent_long_run_km": null,
+          "longest_recent_run_km": null,
+          "recent_race_results": [],
+          "estimated_threshold_pace": null,
+          "estimated_5k_pace": null,
+          "estimated_marathon_pace": null,
+          "easy_pace_or_hr": null
+        },
+        "health_and_preferences": {
+          "current_injuries": [],
+          "recent_injuries": [],
+          "chronic_issues": [],
+          "medical_limitations": [],
+          "sleep_recovery_stress_notes": [],
+          "training_preferences": [],
+          "strength_training": [],
+          "cross_training": [],
+          "planning_philosophy": []
+        },
+        "date_notes": [],
+        "missing_information": [],
+        "assumptions": [],
+        "human_input": {
+          "required": true,
+          "reason": "Missing details about current training load, available running days, and injury status.",
+          "questions": [
+            "What is your current weekly distance in km?",
+            "How many days can you run each week?",
+            "Do you have any current injuries or limitations?"
+          ]
+        },
+        "ready_for_analysis": false
+      }
+    },
+    {
+      "id": "intake_4262f16f0633",
+      "run_id": "run_e3dcda002bd9",
+      "stage": "intake",
+      "created_at": "2026-05-11T18:52:35+00:00",
+      "source": {
+        "run_id": "run_e3dcda002bd9",
+        "date_context": {
+          "plan_build_date": "2026-05-11",
+          "current_date": "2026-05-11",
+          "timezone": "UTC",
+          "planning_start_date": "2026-05-11",
+          "planning_end_date": "2026-07-04",
+          "races": [
+            {
+              "race_name": "Knysna Half Marathon",
+              "race_distance": "21.1 km",
+              "race_date": "2026-07-04",
+              "priority": "A",
+              "days_until_race": 54,
+              "weeks_until_race": 7.7
+            }
+          ],
+          "notes": []
+        },
+        "accumulated_user_input": "I want to train for the Knysna Half Marathon on 4 July 2026. I want to run a sub 1 hour 35 min race. It is quite a hilly race, with the last few km down a VERY steep road. There is about 340m of elevation gain. and 570m of elevation loss, mostly at the end, but it is mostly undulating.\n\nI run between 45 and 60km per week. I can run most days, but 4 per week usually, max 5. I have a non-negotiable of doing a hill training session every Tuesday evening with my running group called Must Love Hills. No injuries or limitations. I am trying to imprve my cadence. It is about 160spm currently.\n\n1. 45-60km 2. 4 or 5 days a week. Only once on the weekend. 3. None",
+        "stage_outputs": {},
+        "pending_questions": []
+      },
+      "data": {
+        "athlete_profile": {
+          "athlete_name": null,
+          "age": null,
+          "sex": null,
+          "height": null,
+          "weight": null,
+          "experience_level": "unknown",
+          "years_running_consistently": null,
+          "current_training_consistency": null
+        },
+        "goal_races": [
+          {
+            "race_name": "Knysna Half Marathon",
+            "race_distance": "21.1 km",
+            "race_date": "2026-07-04",
+            "goal_time": "sub 1 hour 35 min",
+            "terrain": "hilly",
+            "elevation_profile": "340m gain, 570m loss",
+            "expected_conditions": null,
+            "priority": "A",
+            "goal": null
+          }
+        ],
+        "constraints": {
+          "runs_per_week": 5,
+          "preferred_run_days": [],
+          "preferred_workout_days": [
+            "Tuesday"
+          ],
+          "preferred_rest_days": [],
+          "unavailable_days": [],
+          "non_negotiables": [
+            "hill training session every Tuesday evening"
+          ],
+          "preferred_long_run_day": null,
+          "max_weekday_duration_minutes": null,
+          "max_weekend_duration_minutes": null,
+          "travel_or_life_constraints": []
+        },
+        "fitness_background": {
+          "current_weekly_distance_km": 60.0,
+          "typical_weekly_distance_km": null,
+          "recent_long_run_km": null,
+          "longest_recent_run_km": null,
+          "recent_race_results": [],
+          "estimated_threshold_pace": null,
+          "estimated_5k_pace": null,
+          "estimated_marathon_pace": null,
+          "easy_pace_or_hr": null
+        },
+        "health_and_preferences": {
+          "current_injuries": [],
+          "recent_injuries": [],
+          "chronic_issues": [],
+          "medical_limitations": [],
+          "sleep_recovery_stress_notes": [],
+          "training_preferences": [],
+          "strength_training": [],
+          "cross_training": [],
+          "planning_philosophy": []
+        },
+        "date_notes": [],
+        "missing_information": [],
+        "assumptions": [],
+        "human_input": {
+          "required": true,
+          "reason": "Missing details about current training load, available running days, and injury status.",
+          "questions": [
+            "What is your current weekly distance in km?",
+            "Do you have any current injuries or limitations?",
+            "What days are you available to run?"
+          ]
+        },
+        "ready_for_analysis": false
+      }
+    },
+    {
+      "id": "intake_27058ced07a9",
+      "run_id": "run_e3dcda002bd9",
+      "stage": "intake",
+      "created_at": "2026-05-11T18:55:15+00:00",
+      "source": {
+        "run_id": "run_e3dcda002bd9",
+        "date_context": {
+          "plan_build_date": "2026-05-11",
+          "current_date": "2026-05-11",
+          "timezone": "UTC",
+          "planning_start_date": "2026-05-11",
+          "planning_end_date": "2026-07-04",
+          "races": [
+            {
+              "race_name": "Knysna Half Marathon",
+              "race_distance": "21.1 km",
+              "race_date": "2026-07-04",
+              "priority": "A",
+              "days_until_race": 54,
+              "weeks_until_race": 7.7
+            }
+          ],
+          "notes": []
+        },
+        "accumulated_user_input": "I want to train for the Knysna Half Marathon on 4 July 2026. I want to run a sub 1 hour 35 min race. It is quite a hilly race, with the last few km down a VERY steep road. There is about 340m of elevation gain. and 570m of elevation loss, mostly at the end, but it is mostly undulating.\n\nI run between 45 and 60km per week. I can run most days, but 4 per week usually, max 5. I have a non-negotiable of doing a hill training session every Tuesday evening with my running group called Must Love Hills. No injuries or limitations. I am trying to imprve my cadence. It is about 160spm currently.\n\n1. 45-60km 2. 4 or 5 days a week. Only once on the weekend. 3. None\n\n1. 45-60km 2. 4 or 5 days a week. Only once on the weekend. 3. None",
+        "stage_outputs": {},
+        "pending_questions": []
+      },
+      "data": {
+        "athlete_profile": {
+          "athlete_name": null,
+          "age": null,
+          "sex": null,
+          "height": null,
+          "weight": null,
+          "experience_level": "unknown",
+          "years_running_consistently": null,
+          "current_training_consistency": null
+        },
+        "goal_races": [
+          {
+            "race_name": "Knysna Half Marathon",
+            "race_distance": "21.1 km",
+            "race_date": "2026-07-04",
+            "goal_time": "sub 1 hour 35 min",
+            "terrain": "hilly with steep descent",
+            "elevation_profile": "340m gain, 570m loss",
+            "expected_conditions": null,
+            "priority": "A",
+            "goal": null
+          }
+        ],
+        "constraints": {
+          "runs_per_week": 4,
+          "preferred_run_days": [],
+          "preferred_workout_days": [],
+          "preferred_rest_days": [],
+          "unavailable_days": [],
+          "non_negotiables": [
+            "hill training session every Tuesday evening"
+          ],
+          "preferred_long_run_day": null,
+          "max_weekday_duration_minutes": null,
+          "max_weekend_duration_minutes": null,
+          "travel_or_life_constraints": []
+        },
+        "fitness_background": {
+          "current_weekly_distance_km": 52.5,
+          "typical_weekly_distance_km": 52.5,
+          "recent_long_run_km": null,
+          "longest_recent_run_km": null,
+          "recent_race_results": [],
+          "estimated_threshold_pace": null,
+          "estimated_5k_pace": null,
+          "estimated_marathon_pace": null,
+          "easy_pace_or_hr": null
+        },
+        "health_and_preferences": {
+          "current_injuries": [],
+          "recent_injuries": [],
+          "chronic_issues": [],
+          "medical_limitations": [],
+          "sleep_recovery_stress_notes": [],
+          "training_preferences": [],
+          "strength_training": [],
+          "cross_training": [],
+          "planning_philosophy": []
+        },
+        "date_notes": [],
+        "missing_information": [],
+        "assumptions": [
+          "Current weekly distance is estimated at the midpoint of 45-60 km, set to 52.5 km.",
+          "Runs per week is set to 4, with a maximum of 5, based on user input.",
+          "The plan build date is assumed to be the same as the current date: 2026-05-11."
+        ],
+        "human_input": {
+          "required": false,
+          "reason": "",
+          "questions": []
+        },
+        "ready_for_analysis": true
+      }
+    }
+  ],
+  "plans": []
+}
