@@ -33,6 +33,9 @@ class User(Base):
     gym_hide_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     athlete_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     athlete_profile_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_api_key_prefix: Mapped[str | None] = mapped_column(String(12), nullable=True, index=True)
+    external_api_key_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    external_api_key_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class McpApiKey(Base):
@@ -50,45 +53,6 @@ class McpApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-
-class UserOpenAiApiKey(Base):
-    """Encrypted OpenAI API key for vector store / OpenAI UI (plaintext only in memory)."""
-
-    __tablename__ = "user_openai_api_keys"
-
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
-    key_prefix: Mapped[str] = mapped_column(String(64), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-    )
-
-
-class UserCoachSettings(Base):
-    __tablename__ = "user_coach_settings"
-
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    vector_store_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    agent_name: Mapped[str] = mapped_column(String(255), nullable=False, default="Coach")
-    agent_instructions: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    openai_model: Mapped[str] = mapped_column(String(128), nullable=False, default="gpt-4.1-mini")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-    )
 
 
 class Gear(Base):

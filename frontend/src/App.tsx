@@ -9,7 +9,6 @@ import { IngestionPage } from "./pages/IngestionPage";
 import { Login } from "./pages/Login";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StravaExplorerPage } from "./pages/StravaExplorerPage";
-import { VectorStorePage } from "./pages/VectorStorePage";
 
 export default function App() {
   const [status, setStatus] = useState<Status | null | "loading">("loading");
@@ -55,7 +54,6 @@ export default function App() {
           <Route path="activities" element={<ActivitiesPage />} />
           <Route path="ingestion" element={<IngestionPage />} />
           <Route path="strava-explorer" element={<StravaExplorerPage />} />
-          <Route path="vector-store" element={<VectorStorePage />} />
           <Route path="events" element={<EventsPage />} />
           <Route
             path="settings"

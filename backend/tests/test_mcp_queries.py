@@ -15,7 +15,6 @@ from app.models import (
     StravaActivitySplit,
     User,
 )
-from app.services.coach_openai_service import ALLOWED_MCP_TOOLS
 
 
 def _activity(activity_id: int, athlete_id: int, deleted: bool = False) -> StravaActivity:
@@ -104,10 +103,6 @@ def test_get_current_date_returns_natural_language_date() -> None:
     output = server.get_current_date()
 
     assert re.fullmatch(r"[A-Z][a-z]+ [1-9][0-9]? [A-Z][a-z]+ \d{4}", output)
-
-
-def test_coach_agent_allows_current_date_mcp_tool() -> None:
-    assert "get_current_date" in ALLOWED_MCP_TOOLS
 
 
 def test_sport_type_normalization_accepts_lowercase_run_aliases() -> None:

@@ -11,15 +11,8 @@ from app.db import get_db
 from app.deps import require_jwt_user
 from app.models import EventLog, PendingActivity, User
 from app.services.activity_service import include_gear_in_shoe_vault, list_gear
-from app.services.coach_link_service import CoachLinkService
-from app.services.coach_settings_service import get_or_create_coach_settings, update_coach_settings
+from app.services.external_api_key_service import assign_external_api_key, revoke_external_api_key
 from app.services.mcp_api_key_service import create_mcp_api_key, list_mcp_api_keys, revoke_mcp_api_key
-from app.services.openai_credential_service import (
-    delete_openai_api_key,
-    get_openai_credential_status,
-    save_openai_api_key,
-)
-from app.services.redis_client import get_redis_client
 from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
 
@@ -33,17 +26,6 @@ class SettingsUpdate(BaseModel):
 
 class McpApiKeyCreate(BaseModel):
     name: str | None = None
-
-
-class OpenAiApiKeyBody(BaseModel):
-    api_key: str
-
-
-class CoachSettingsUpdate(BaseModel):
-    vector_store_id: str | None = None
-    agent_name: str | None = None
-    agent_instructions: str | None = None
-    openai_model: str | None = None
 
 
 class StravaExplorerRequest(BaseModel):
@@ -151,101 +133,35 @@ def revoke_mcp_key(
     return {"revoked": True}
 
 
-@router.get("/openai-api-key")
-def openai_api_key_status(
+@router.get("/external-api-key")
+def external_api_key_status(user: User = Depends(require_jwt_user)) -> dict:
+    prefix = f"{user.external_api_key_prefix}..." if user.external_api_key_prefix else None
+    created_at = user.external_api_key_created_at.isoformat() if user.external_api_key_created_at else None
+    return {"has_key": bool(user.external_api_key_hash), "prefix": prefix, "created_at": created_at}
+
+
+@router.post("/external-api-key")
+def external_api_key_generate(
     db: Session = Depends(get_db),
     user: User = Depends(require_jwt_user),
 ) -> dict:
-    configured, key_prefix, updated_at = get_openai_credential_status(db, user)
+    raw_key = assign_external_api_key(db, user)
     return {
-        "configured": configured,
-        "key_prefix": key_prefix,
-        "updated_at": updated_at.isoformat() if updated_at else None,
+        "has_key": True,
+        "api_key": raw_key,
+        "prefix": f"{user.external_api_key_prefix}...",
+        "created_at": user.external_api_key_created_at.isoformat() if user.external_api_key_created_at else None,
+        "message": "Copy this key now. It will not be shown again.",
     }
 
 
-@router.put("/openai-api-key")
-def openai_api_key_put(
-    body: OpenAiApiKeyBody,
+@router.delete("/external-api-key")
+def external_api_key_revoke(
     db: Session = Depends(get_db),
     user: User = Depends(require_jwt_user),
 ) -> dict:
-    try:
-        save_openai_api_key(db, user, body.api_key)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    configured, key_prefix, updated_at = get_openai_credential_status(db, user)
-    return {
-        "configured": configured,
-        "key_prefix": key_prefix,
-        "updated_at": updated_at.isoformat() if updated_at else None,
-    }
-
-
-@router.delete("/openai-api-key")
-def openai_api_key_delete(
-    db: Session = Depends(get_db),
-    user: User = Depends(require_jwt_user),
-) -> dict:
-    delete_openai_api_key(db, user)
-    return {"ok": True}
-
-
-@router.get("/coach/settings")
-def coach_settings_get(
-    db: Session = Depends(get_db),
-    user: User = Depends(require_jwt_user),
-) -> dict:
-    row = get_or_create_coach_settings(db, user)
-    return {
-        "vector_store_id": row.vector_store_id,
-        "agent_name": row.agent_name,
-        "agent_instructions": row.agent_instructions,
-        "openai_model": row.openai_model,
-        "telegram_user_id": user.telegram_user_id,
-        "telegram_linked": bool(user.telegram_user_id),
-    }
-
-
-@router.patch("/coach/settings")
-def coach_settings_patch(
-    body: CoachSettingsUpdate,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_jwt_user),
-) -> dict:
-    try:
-        row = update_coach_settings(
-            db,
-            user,
-            vector_store_id=body.vector_store_id if "vector_store_id" in body.model_fields_set else ...,
-            agent_name=body.agent_name if "agent_name" in body.model_fields_set else ...,
-            agent_instructions=(
-                body.agent_instructions if "agent_instructions" in body.model_fields_set else ...
-            ),
-            openai_model=body.openai_model if "openai_model" in body.model_fields_set else ...,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    return {
-        "vector_store_id": row.vector_store_id,
-        "agent_name": row.agent_name,
-        "agent_instructions": row.agent_instructions,
-        "openai_model": row.openai_model,
-        "telegram_user_id": user.telegram_user_id,
-        "telegram_linked": bool(user.telegram_user_id),
-    }
-
-
-@router.post("/coach/link-code")
-def coach_link_code_create(
-    user: User = Depends(require_jwt_user),
-) -> dict:
-    link_service = CoachLinkService(get_redis_client())
-    code, expires_in_seconds = link_service.issue_code(user.id)
-    return {
-        "code": code,
-        "expires_in_seconds": expires_in_seconds,
-    }
+    revoke_external_api_key(db, user)
+    return {"has_key": False, "prefix": None, "created_at": None}
 
 
 @router.get("/summary")

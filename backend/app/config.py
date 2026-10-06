@@ -37,16 +37,6 @@ class Settings(BaseSettings):
         default=0,
         validation_alias=AliasChoices("TELEGRAM_ALLOWED_USER_ID", "ACTIVITYADMIN_TELEGRAM_ALLOWED_USER_ID"),
     )
-    coach_telegram_bot_token: str = ""
-    coach_telegram_webhook_secret: str = ""
-    coach_telegram_allowed_user_id: int = 0
-    coach_conversation_history_user_turn_limit: int = 20
-    coach_link_code_ttl_seconds: int = 600
-
-    redis_url: str = "redis://redis:6379/0"
-    mcp_server_url: str = ""
-    strava_mcp_bearer: str = ""
-
     app_secret_key: str = ""
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
@@ -60,9 +50,6 @@ class Settings(BaseSettings):
     frontend_base_url: str = ""
     ui_port: int = 3001
     ui_api_base_url: str = "/api"
-
-    # OpenAI (vector store / file search UI — server-side only)
-    openai_api_key: str = ""
 
     @property
     def database_url(self) -> str:
@@ -80,12 +67,6 @@ class Settings(BaseSettings):
         if not self.public_base_url or not self.telegram_webhook_secret:
             return ""
         return f"{self._normalized_public_base_url}/api/telegram/activityadmin/webhook/{self.telegram_webhook_secret}"
-
-    @property
-    def coach_telegram_webhook_url(self) -> str:
-        if not self.public_base_url or not self.coach_telegram_webhook_secret:
-            return ""
-        return f"{self._normalized_public_base_url}/api/telegram/coach/webhook/{self.coach_telegram_webhook_secret}"
 
 
 @lru_cache

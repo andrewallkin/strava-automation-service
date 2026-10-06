@@ -1,4 +1,3 @@
-from app.services.coach_openai_service import TELEGRAM_MARKDOWN_V2_OUTPUT
 from app.services.telegram_markdown import MARKDOWN_V2, escape_markdown_v2
 
 
@@ -21,10 +20,3 @@ def test_escape_markdown_v2_reserved_in_activity_title() -> None:
 
 def test_escape_markdown_v2_backslash_preserved_via_doubling() -> None:
     assert escape_markdown_v2(r"a\b") == r"a\\b"
-
-
-def test_telegram_output_instructions_keep_agent_in_plain_text() -> None:
-    assert "MarkdownV2" in TELEGRAM_MARKDOWN_V2_OUTPUT
-    assert "•" in TELEGRAM_MARKDOWN_V2_OUTPUT
-    assert "plain text" in TELEGRAM_MARKDOWN_V2_OUTPUT
-    assert "Do not include MarkdownV2 backslash escapes" in TELEGRAM_MARKDOWN_V2_OUTPUT

@@ -136,31 +136,15 @@ export type McpApiKey = {
   api_key?: string;
 };
 
-export type OpenAiApiKeyStatus = {
-  configured: boolean;
-  key_prefix: string | null;
-  updated_at: string | null;
+export type ExternalApiKeyStatus = {
+  has_key: boolean;
+  prefix: string | null;
+  created_at: string | null;
 };
 
-export type CoachSettings = {
-  vector_store_id: string | null;
-  agent_name: string;
-  agent_instructions: string;
-  openai_model: string;
-  telegram_user_id: number | null;
-  telegram_linked: boolean;
-};
-
-export type CoachSettingsUpdate = {
-  vector_store_id?: string | null;
-  agent_name?: string;
-  agent_instructions?: string;
-  openai_model?: string;
-};
-
-export type CoachLinkCodeResponse = {
-  code: string;
-  expires_in_seconds: number;
+export type ExternalApiKeyGenerated = ExternalApiKeyStatus & {
+  api_key: string;
+  message: string;
 };
 
 export type EventRow = {
@@ -249,69 +233,28 @@ export async function revokeMcpApiKey(id: number): Promise<void> {
   if (!response.ok) throw new Error(`Revoke failed: ${response.status}`);
 }
 
-export async function fetchOpenAiApiKeyStatus(): Promise<OpenAiApiKeyStatus> {
-  return getJson<OpenAiApiKeyStatus>("/ui/openai-api-key");
+export async function fetchExternalApiKeyStatus(): Promise<ExternalApiKeyStatus> {
+  return getJson<ExternalApiKeyStatus>("/ui/external-api-key");
 }
 
-async function parseFastApiError(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { detail?: string | unknown };
-    if (typeof body.detail === "string") return body.detail;
-    if (Array.isArray(body.detail)) {
-      const first = body.detail[0] as { msg?: string } | undefined;
-      if (first && typeof first.msg === "string") return first.msg;
-    }
-  } catch {
-    /* ignore */
-  }
-  return `Request failed: ${response.status}`;
-}
-
-export async function saveOpenAiApiKey(apiKey: string): Promise<OpenAiApiKeyStatus> {
-  const response = await fetch(`${API_BASE}/ui/openai-api-key`, {
-    ...FETCH_OPTS,
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ api_key: apiKey })
-  });
-  handle401(response, true);
-  if (!response.ok) throw new Error(await parseFastApiError(response));
-  return (await response.json()) as OpenAiApiKeyStatus;
-}
-
-export async function deleteOpenAiApiKey(): Promise<void> {
-  const response = await fetch(`${API_BASE}/ui/openai-api-key`, {
-    ...FETCH_OPTS,
-    method: "DELETE"
-  });
-  handle401(response, true);
-  if (!response.ok) throw new Error(await parseFastApiError(response));
-}
-
-export async function fetchCoachSettings(): Promise<CoachSettings> {
-  return getJson<CoachSettings>("/ui/coach/settings");
-}
-
-export async function updateCoachSettings(input: CoachSettingsUpdate): Promise<CoachSettings> {
-  const response = await fetch(`${API_BASE}/ui/coach/settings`, {
-    ...FETCH_OPTS,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input)
-  });
-  handle401(response, true);
-  if (!response.ok) throw new Error(await parseFastApiError(response));
-  return (await response.json()) as CoachSettings;
-}
-
-export async function createCoachLinkCode(): Promise<CoachLinkCodeResponse> {
-  const response = await fetch(`${API_BASE}/ui/coach/link-code`, {
+export async function generateExternalApiKey(): Promise<ExternalApiKeyGenerated> {
+  const response = await fetch(`${API_BASE}/ui/external-api-key`, {
     ...FETCH_OPTS,
     method: "POST"
   });
   handle401(response, true);
-  if (!response.ok) throw new Error(await parseFastApiError(response));
-  return (await response.json()) as CoachLinkCodeResponse;
+  if (!response.ok) throw new Error(`Key generation failed: ${response.status}`);
+  return (await response.json()) as ExternalApiKeyGenerated;
+}
+
+export async function revokeExternalApiKey(): Promise<ExternalApiKeyStatus> {
+  const response = await fetch(`${API_BASE}/ui/external-api-key`, {
+    ...FETCH_OPTS,
+    method: "DELETE"
+  });
+  handle401(response, true);
+  if (!response.ok) throw new Error(`Revoke failed: ${response.status}`);
+  return (await response.json()) as ExternalApiKeyStatus;
 }
 
 export async function fetchSummary(): Promise<Summary> {
@@ -518,155 +461,6 @@ export type GymSummary = {
 
 export async function fetchGymSummary(): Promise<GymSummary> {
   return getJson<GymSummary>("/ui/gym-summary");
-}
-
-/** Max upload size for vector store files (must match backend). */
-export const VECTOR_STORE_MAX_FILE_BYTES = 10 * 1024 * 1024;
-
-export type VectorStore = {
-  id: string;
-  name: string | null;
-  status: string | null;
-  created_at: number | null;
-  file_counts: Record<string, number> | null;
-};
-
-export type VectorStoreFileRow = {
-  file_id: string;
-  vector_store_id: string;
-  status: string | null;
-  created_at: number | null;
-  usage_bytes: number | null;
-  filename: string | null;
-};
-
-export type VectorStoreListResponse = {
-  data: VectorStore[];
-  has_more: boolean;
-  last_id: string | null;
-};
-
-export type VectorStoreFilesResponse = {
-  data: VectorStoreFileRow[];
-  has_more: boolean;
-  last_id: string | null;
-};
-
-async function readUiErrorMessage(response: Response): Promise<string> {
-  const base = `Request failed: ${response.status}`;
-  try {
-    const j = (await response.json()) as { detail?: unknown };
-    const d = j.detail;
-    if (typeof d === "string") return d;
-    if (Array.isArray(d)) {
-      const parts = d.map((x) =>
-        typeof x === "object" && x && "msg" in x ? String((x as { msg: unknown }).msg) : String(x)
-      );
-      return parts.join(", ") || base;
-    }
-  } catch {
-    /* ignore */
-  }
-  return base;
-}
-
-export async function fetchVectorStores(params?: {
-  limit?: number;
-  after?: string | null;
-}): Promise<VectorStoreListResponse> {
-  const sp = new URLSearchParams();
-  if (params?.limit != null) sp.set("limit", String(params.limit));
-  if (params?.after) sp.set("after", params.after);
-  const q = sp.toString();
-  const response = await fetch(`${API_BASE}/ui/vector-stores${q ? `?${q}` : ""}`, NO_STORE_FETCH);
-  handle401(response, true);
-  if (!response.ok) throw new Error(await readUiErrorMessage(response));
-  return (await response.json()) as VectorStoreListResponse;
-}
-
-export async function createVectorStore(name?: string | null): Promise<VectorStore> {
-  const response = await fetch(`${API_BASE}/ui/vector-stores`, {
-    ...FETCH_OPTS,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: name?.trim() || null })
-  });
-  handle401(response, true);
-  if (!response.ok) throw new Error(await readUiErrorMessage(response));
-  return (await response.json()) as VectorStore;
-}
-
-export async function fetchVectorStore(vectorStoreId: string): Promise<VectorStore> {
-  const response = await fetch(
-    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}`,
-    NO_STORE_FETCH
-  );
-  handle401(response, true);
-  if (!response.ok) throw new Error(await readUiErrorMessage(response));
-  return (await response.json()) as VectorStore;
-}
-
-export async function deleteVectorStore(vectorStoreId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}`,
-    {
-      ...FETCH_OPTS,
-      method: "DELETE"
-    }
-  );
-  handle401(response, true);
-  if (!response.ok) throw new Error(await readUiErrorMessage(response));
-}
-
-export async function fetchVectorStoreFiles(
-  vectorStoreId: string,
-  params?: { limit?: number; after?: string | null }
-): Promise<VectorStoreFilesResponse> {
-  const sp = new URLSearchParams();
-  if (params?.limit != null) sp.set("limit", String(params.limit));
-  if (params?.after) sp.set("after", params.after);
-  const q = sp.toString();
-  const response = await fetch(
-    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}/files${q ? `?${q}` : ""}`,
-    NO_STORE_FETCH
-  );
-  handle401(response, true);
-  if (!response.ok) throw new Error(await readUiErrorMessage(response));
-  return (await response.json()) as VectorStoreFilesResponse;
-}
-
-export async function uploadVectorStoreFile(
-  vectorStoreId: string,
-  file: File
-): Promise<VectorStoreFileRow> {
-  const fd = new FormData();
-  fd.append("file", file);
-  const response = await fetch(
-    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}/files`,
-    {
-      ...FETCH_OPTS,
-      method: "POST",
-      body: fd
-    }
-  );
-  handle401(response, true);
-  if (!response.ok) throw new Error(await readUiErrorMessage(response));
-  return (await response.json()) as VectorStoreFileRow;
-}
-
-export async function deleteVectorStoreFile(
-  vectorStoreId: string,
-  fileId: string
-): Promise<void> {
-  const response = await fetch(
-    `${API_BASE}/ui/vector-stores/${encodeURIComponent(vectorStoreId)}/files/${encodeURIComponent(fileId)}`,
-    {
-      ...FETCH_OPTS,
-      method: "DELETE"
-    }
-  );
-  handle401(response, true);
-  if (!response.ok) throw new Error(await readUiErrorMessage(response));
 }
 
 export async function disconnectStrava(): Promise<void> {

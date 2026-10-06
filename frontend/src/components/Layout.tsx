@@ -11,7 +11,6 @@ const tabs = [
   { to: "/activities", label: "Activities" },
   { to: "/ingestion", label: "Ingestion" },
   { to: "/strava-explorer", label: "API Explorer" },
-  { to: "/vector-store", label: "Vector stores" },
   { to: "/events", label: "Events" },
   { to: "/settings", label: "Settings" },
 ];

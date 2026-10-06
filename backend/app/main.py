@@ -2,6 +2,9 @@ import logging
 import logging.config
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+from app.external_errors import ExternalAPIError
 
 
 def _configure_logging() -> None:
@@ -33,7 +36,7 @@ def _configure_logging() -> None:
             "auth":           {"handlers": ["console"], "level": log_level, "propagate": False},
             "db":             {"handlers": ["console"], "level": log_level, "propagate": False},
             "ingestion":      {"handlers": ["console"], "level": log_level, "propagate": False},
-            "coach":          {"handlers": ["console"], "level": log_level, "propagate": False},
+            "external":       {"handlers": ["console"], "level": log_level, "propagate": False},
         },
         "root": {"handlers": ["console"], "level": "WARNING"},
     })
@@ -45,20 +48,23 @@ app = FastAPI(title="Strava Automation Service")
 
 from app.routers.auth import logout_router, router as auth_router
 from app.routers.backfill_api import router as backfill_router
-from app.routers.telegram_coach_webhook import router as telegram_coach_router
+from app.routers.external import router as external_router
 from app.routers.strava_webhook import router as strava_router
 from app.routers.telegram_webhook import router as telegram_router
 from app.routers.ui_api import router as ui_router
-from app.routers.vector_stores_ui import router as vector_stores_ui_router
 
 app.include_router(auth_router)
 app.include_router(logout_router)
 app.include_router(strava_router)
 app.include_router(telegram_router)
-app.include_router(telegram_coach_router)
 app.include_router(ui_router)
-app.include_router(vector_stores_ui_router)
 app.include_router(backfill_router)
+app.include_router(external_router)
+
+
+@app.exception_handler(ExternalAPIError)
+def external_api_error(_request, exc: ExternalAPIError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"error": {"code": exc.code, "message": exc.message}})
 
 
 @app.get("/api/health")
