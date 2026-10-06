@@ -33,3 +33,6 @@ postgres_data/
 
 # Project-specific
 /strava_api_responses
+
+# Local agent design notes (not part of the app)
+docs/superpowers/
