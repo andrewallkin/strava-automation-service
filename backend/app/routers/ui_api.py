@@ -11,7 +11,9 @@ from app.db import get_db
 from app.deps import require_jwt_user
 from app.models import EventLog, PendingActivity, User
 from app.services.activity_service import include_gear_in_shoe_vault, list_gear
+from app.services.external_activities import list_activities, stat_activities_between
 from app.services.external_api_key_service import assign_external_api_key, revoke_external_api_key
+from app.services.external_stats import by_sport_type, local_today, monday_on_or_before
 from app.services.mcp_api_key_service import create_mcp_api_key, list_mcp_api_keys, revoke_mcp_api_key
 from app.services.strava_service import StravaService
 from app.services.webhook_processor import process_activity
@@ -272,6 +274,53 @@ def activities(
         for a in raw
         if (a.get("type") or a.get("sport_type")) in FEED_TYPES
     ]
+
+
+@router.get("/stored-activities")
+def stored_activities(
+    page: int = Query(default=1, ge=1),
+    perPage: int = Query(default=15, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    return list_activities(
+        db,
+        user,
+        after=None,
+        before=None,
+        sport=None,
+        type_group_name=None,
+        min_distance_m=None,
+        max_distance_m=None,
+        min_moving_time_sec=None,
+        max_moving_time_sec=None,
+        has_heartrate=None,
+        gear_id=None,
+        trainer=None,
+        page=page,
+        per_page=perPage,
+        sort="start_date_desc",
+    )
+
+
+@router.get("/activity-type-summary")
+def activity_type_summary(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_jwt_user),
+) -> dict:
+    this_week_start = monday_on_or_before(local_today())
+    last_week_start = this_week_start - timedelta(days=7)
+    rows = stat_activities_between(db, user, last_week_start, this_week_start + timedelta(days=6))
+
+    def week(start: date) -> dict:
+        end = start + timedelta(days=6)
+        return {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "bySportType": by_sport_type([row for row in rows if start <= row.local_date <= end]),
+        }
+
+    return {"thisWeek": week(this_week_start), "lastWeek": week(last_week_start)}
 
 
 @router.get("/shoe-vault")
