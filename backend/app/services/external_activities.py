@@ -485,6 +485,7 @@ def stat_activities_between(db: Session, user: User, start: date, end: date) -> 
                 has_heartrate=bool(row.has_heartrate),
                 hr_zones=zones,
                 description=row.description,
+                elapsed_time_seconds=row.elapsed_time_seconds,
             )
         )
     return items

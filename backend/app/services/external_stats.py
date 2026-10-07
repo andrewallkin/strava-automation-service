@@ -10,6 +10,7 @@ from app.mcp.formatting import is_run_sport
 
 JOHANNESBURG = ZoneInfo("Africa/Johannesburg")
 STRENGTH_SPORTS = {"WeightTraining", "Workout"}
+UNKNOWN_SPORT_TYPE = "Unknown"
 INJURY_PATTERNS = (
     ("shin", re.compile(r"shin", re.IGNORECASE)),
     ("IT", re.compile(r"\bIT\b", re.IGNORECASE)),
@@ -49,6 +50,7 @@ class StatActivity:
     has_heartrate: bool
     hr_zones: tuple[int, int, int, int, int]
     description: str | None
+    elapsed_time_seconds: int | None = None
 
 
 def _in_window(activity: StatActivity, start: date, end: date) -> bool:
@@ -65,6 +67,23 @@ def _mean(values: list[float]) -> float | None:
     if not values:
         return None
     return sum(values) / len(values)
+
+
+def by_sport_type(rows: list[StatActivity]) -> dict[str, dict]:
+    grouped: dict[str, list[StatActivity]] = defaultdict(list)
+    for row in rows:
+        grouped[row.sport_type or UNKNOWN_SPORT_TYPE].append(row)
+    return {
+        sport: {
+            "activityCount": len(items),
+            "distanceM": round(sum(item.distance_m or 0 for item in items), 1),
+            "movingTimeSec": sum(item.moving_time_seconds or 0 for item in items),
+            "elapsedTimeSec": sum(item.elapsed_time_seconds or 0 for item in items),
+            "elevationGainM": round(sum(item.elevation_gain_m or 0 for item in items), 1),
+            "days": sorted({item.local_date.isoformat() for item in items}),
+        }
+        for sport, items in sorted(grouped.items())
+    }
 
 
 def summarize_window(
@@ -166,6 +185,7 @@ def summarize_window(
             "sameDayAsRun": same_day,
         },
         "other": {"activityCount": other_count},
+        "bySportType": by_sport_type(rows),
         "restDays": rest_days,
         "weekOverWeekDistancePct": wow,
         "flags": flags,
@@ -265,4 +285,5 @@ def consistency(activities: list[StatActivity], today: date) -> dict:
         "averageWeeklyRuns28d": round(len(runs) / 4, 2),
         "longestRun28dM": round(longest, 1),
         "injuryFlagKeywordsInNotes": keywords,
+        "activitiesBySportType28d": {sport: totals["activityCount"] for sport, totals in by_sport_type(rows).items()},
     }
