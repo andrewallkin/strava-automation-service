@@ -122,6 +122,11 @@ describe("activityCardFacts", () => {
     expect(activityCardFacts(workout, false).map((fact) => fact.key)).toEqual(["moving", "elapsed"]);
   });
 
+  it("omits pace for runs when average pace is null", () => {
+    const run = activity({ sportType: "Run", distanceM: 5000, movingTimeSec: 1800, averagePaceSecPerKm: null });
+    expect(activityCardFacts(run, false).map((fact) => fact.key)).not.toContain("pace");
+  });
+
   it("shows pace for runs and drops elapsed time and elevation when compact", () => {
     const run = activity({
       sportType: "Run",

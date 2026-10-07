@@ -4,7 +4,7 @@ import { formatStravaLocalDateTime } from "../lib/datetimeDisplay";
 
 export function StoredActivityCard({ activity, compact = false }: { activity: StoredActivity; compact?: boolean }) {
   const sportType = activity.sportType ?? "Unknown";
-  const accent = isRunSport(activity.sportType) ? "border-orange-400" : "border-gray-300";
+  const accent = isRunSport(activity.sportType) ? "border-l-orange-400" : "border-l-gray-300";
 
   return (
     <div className={`flex gap-4 px-5 ${compact ? "py-3" : "py-4"} hover:bg-gray-50 transition-colors border-l-4 ${accent}`}>

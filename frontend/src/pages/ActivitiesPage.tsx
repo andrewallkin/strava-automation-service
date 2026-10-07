@@ -10,6 +10,7 @@ export function ActivitiesPage() {
   const [nextPage, setNextPage] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStoredActivities(1, PAGE_SIZE)
@@ -23,12 +24,13 @@ export function ActivitiesPage() {
   async function loadMore() {
     if (nextPage === null || loadingMore) return;
     setLoadingMore(true);
+    setLoadMoreError(null);
     try {
       const page = await fetchStoredActivities(nextPage, PAGE_SIZE);
       setActivities((current) => [...(current ?? []), ...page.data]);
       setNextPage(page.pagination.nextPage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load more activities");
+      setLoadMoreError(err instanceof Error ? err.message : "Failed to load more activities");
     } finally {
       setLoadingMore(false);
     }
@@ -59,6 +61,7 @@ export function ActivitiesPage() {
           </div>
           {nextPage !== null && (
             <div className="px-5 py-3 border-t border-gray-100 text-center">
+              {loadMoreError && <p className="text-sm text-red-600 mb-2">{loadMoreError}</p>}
               <button
                 type="button"
                 onClick={loadMore}

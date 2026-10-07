@@ -92,7 +92,7 @@ export function activityCardFacts(activity: StoredActivity, compact: boolean): C
   if (!compact && activity.elapsedTimeSec != null) {
     facts.push({ key: "elapsed", text: `elapsed ${formatMovingTime(activity.elapsedTimeSec)}` });
   }
-  if (isRunSport(activity.sportType) && activity.averagePaceSecPerKm) {
+  if (isRunSport(activity.sportType) && activity.averagePaceSecPerKm != null) {
     facts.push({ key: "pace", text: formatPace(activity.averagePaceSecPerKm) });
   }
   if (!compact && activity.elevationGainM && activity.elevationGainM > 0) {

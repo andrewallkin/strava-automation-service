@@ -16,7 +16,7 @@ export function LatestActivitiesCard({ className }: { className?: string }) {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load activities"));
   }, []);
 
-  if (error) return <ErrorCard message={error} />;
+  if (error) return <ErrorCard message={error} className="h-full" />;
 
   return (
     <div className={`flex flex-col bg-white rounded-xl shadow-sm border border-gray-200${className ? ` ${className}` : ""}`}>

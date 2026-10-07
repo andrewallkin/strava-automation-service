@@ -31,7 +31,7 @@ export function ActivityTypeWeekCard({ className }: { className?: string }) {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load activity types"));
   }, []);
 
-  if (error) return <ErrorCard message={error} />;
+  if (error) return <ErrorCard message={error} className="h-full" />;
 
   const rows = data ? activityTypeRows(data) : [];
   const totals = data ? weekTotals(data.thisWeek) : null;

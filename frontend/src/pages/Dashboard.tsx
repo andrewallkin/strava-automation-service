@@ -285,9 +285,9 @@ export function RecentEvents({ events }: { events: EventRow[] }) {
   );
 }
 
-export function ErrorCard({ message }: { message: string }) {
+export function ErrorCard({ message, className }: { message: string; className?: string }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-red-200 px-5 py-4">
+    <div className={`bg-white rounded-xl shadow-sm border border-red-200 px-5 py-4${className ? ` ${className}` : ""}`}>
       <p className="text-sm text-red-600">{message}</p>
     </div>
   );
