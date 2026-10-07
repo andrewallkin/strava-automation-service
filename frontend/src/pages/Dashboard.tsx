@@ -174,23 +174,24 @@ export function ActivityFeed() {
   );
 }
 
-export function StatsGrid({ summary }: { summary: Summary | null }) {
+export function StatsGrid({ summary, className }: { summary: Summary | null; className?: string }) {
+  const card = "bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col justify-center";
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3">
+    <div className={`grid grid-cols-2 grid-rows-2 gap-3${className ? ` ${className}` : ""}`}>
+      <div className={card}>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pending</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{summary?.pending_count ?? "-"}</p>
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3">
+      <div className={card}>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Runs updated</p>
         <p className="mt-1 text-2xl font-bold text-orange-500">{summary?.runs_updated ?? "-"}</p>
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3">
+      <div className={card}>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gym hidden</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{summary?.gym_hidden ?? "-"}</p>
       </div>
       <div
-        className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3"
+        className={card}
         title="When the automation last processed something (webhook, run update, gym hide, etc.)"
       >
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last automation</p>
@@ -284,7 +285,7 @@ export function RecentEvents({ events }: { events: EventRow[] }) {
   );
 }
 
-function ErrorCard({ message }: { message: string }) {
+export function ErrorCard({ message }: { message: string }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-red-200 px-5 py-4">
       <p className="text-sm text-red-600">{message}</p>
