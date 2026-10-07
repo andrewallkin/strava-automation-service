@@ -494,3 +494,55 @@ export async function logout(): Promise<void> {
     throw new Error(`Logout failed: ${response.status}`);
   }
 }
+
+export type StoredActivity = {
+  id: string;
+  name: string | null;
+  sportType: string | null;
+  startDateLocal: string | null;
+  distanceM: number | null;
+  movingTimeSec: number | null;
+  elapsedTimeSec: number | null;
+  elevationGainM: number | null;
+  averageHeartrate: number | null;
+  averagePaceSecPerKm: number | null;
+};
+
+export type StoredActivityPage = {
+  data: StoredActivity[];
+  pagination: {
+    page: number;
+    perPage: number;
+    total: number;
+    totalPages: number;
+    nextPage: number | null;
+  };
+};
+
+export type SportTypeTotals = {
+  activityCount: number;
+  distanceM: number;
+  movingTimeSec: number;
+  elapsedTimeSec: number;
+  elevationGainM: number;
+  days: string[];
+};
+
+export type ActivityTypeWeek = {
+  start: string;
+  end: string;
+  bySportType: Record<string, SportTypeTotals>;
+};
+
+export type ActivityTypeSummary = {
+  thisWeek: ActivityTypeWeek;
+  lastWeek: ActivityTypeWeek;
+};
+
+export async function fetchStoredActivities(page = 1, perPage = 15): Promise<StoredActivityPage> {
+  return getJson<StoredActivityPage>(`/ui/stored-activities?page=${page}&perPage=${perPage}`);
+}
+
+export async function fetchActivityTypeSummary(): Promise<ActivityTypeSummary> {
+  return getJson<ActivityTypeSummary>("/ui/activity-type-summary");
+}
