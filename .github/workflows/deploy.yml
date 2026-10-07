@@ -49,17 +49,6 @@ jobs:
           ENV_ACTIVITYADMIN_TELEGRAM_BOT_TOKEN: ${{ secrets.ACTIVITYADMIN_TELEGRAM_BOT_TOKEN }}
           ENV_ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET }}
           ENV_ACTIVITYADMIN_TELEGRAM_ALLOWED_USER_ID: ${{ secrets.ACTIVITYADMIN_TELEGRAM_ALLOWED_USER_ID }}
-
-          ENV_COACH_TELEGRAM_BOT_TOKEN: ${{ secrets.COACH_TELEGRAM_BOT_TOKEN }}
-          ENV_COACH_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.COACH_TELEGRAM_WEBHOOK_SECRET }}
-          ENV_COACH_TELEGRAM_ALLOWED_USER_ID: ${{ secrets.COACH_TELEGRAM_ALLOWED_USER_ID }}
-          ENV_COACH_CONVERSATION_HISTORY_USER_TURN_LIMIT: ${{ secrets.COACH_CONVERSATION_HISTORY_USER_TURN_LIMIT }}
-          ENV_COACH_LINK_CODE_TTL_SECONDS: ${{ secrets.COACH_LINK_CODE_TTL_SECONDS }}
-
-          ENV_REDIS_URL: ${{ secrets.REDIS_URL }}
-          
-          ENV_MCP_SERVER_URL: ${{ secrets.MCP_SERVER_URL }}
-          ENV_STRAVA_MCP_BEARER: ${{ secrets.STRAVA_MCP_BEARER }}
         run: |
           ssh -t -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT }} -o StrictHostKeyChecking=no -o ServerAliveInterval=50 -o ServerAliveCountMax=10 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<EOF
           set -euo pipefail
@@ -118,17 +107,6 @@ jobs:
           ACTIVITYADMIN_TELEGRAM_BOT_TOKEN=${ENV_ACTIVITYADMIN_TELEGRAM_BOT_TOKEN}
           ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET=${ENV_ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET}
           ACTIVITYADMIN_TELEGRAM_ALLOWED_USER_ID=${ENV_ACTIVITYADMIN_TELEGRAM_ALLOWED_USER_ID}
-
-          COACH_TELEGRAM_BOT_TOKEN=${ENV_COACH_TELEGRAM_BOT_TOKEN}
-          COACH_TELEGRAM_WEBHOOK_SECRET=${ENV_COACH_TELEGRAM_WEBHOOK_SECRET}
-          COACH_TELEGRAM_ALLOWED_USER_ID=${ENV_COACH_TELEGRAM_ALLOWED_USER_ID}
-          COACH_CONVERSATION_HISTORY_USER_TURN_LIMIT=${ENV_COACH_CONVERSATION_HISTORY_USER_TURN_LIMIT}
-          COACH_LINK_CODE_TTL_SECONDS=${ENV_COACH_LINK_CODE_TTL_SECONDS}
-
-          REDIS_URL=${ENV_REDIS_URL}
-
-          MCP_SERVER_URL=${ENV_MCP_SERVER_URL}
-          STRAVA_MCP_BEARER=${ENV_STRAVA_MCP_BEARER}
           EOF_ENV
           echo "✓ Environment configured"
           echo "::endgroup::"
@@ -175,8 +153,6 @@ jobs:
           ENV_STRAVA_WEBHOOK_VERIFY_TOKEN: ${{ secrets.STRAVA_WEBHOOK_VERIFY_TOKEN }}
           ENV_ACTIVITYADMIN_TELEGRAM_BOT_TOKEN: ${{ secrets.ACTIVITYADMIN_TELEGRAM_BOT_TOKEN }}
           ENV_ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET }}
-          ENV_COACH_TELEGRAM_BOT_TOKEN: ${{ secrets.COACH_TELEGRAM_BOT_TOKEN }}
-          ENV_COACH_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.COACH_TELEGRAM_WEBHOOK_SECRET }}
         run: |
           echo "::group::🔗 Registering Strava Webhook"
           STRAVA_CALLBACK_URL="${ENV_PUBLIC_BASE_URL}/api/strava/webhook"
@@ -214,17 +190,5 @@ jobs:
             echo "✓ Telegram webhook registered"
           else
             echo "⚠️  Telegram webhook registration may have failed: ${TRESULT}"
-          fi
-          echo "::endgroup::"
-
-          echo "::group::🧠 Registering Coach Telegram Webhook"
-          echo "Setting coach Telegram webhook..."
-          CRESULT=$(curl -sf -X POST "https://api.telegram.org/bot${ENV_COACH_TELEGRAM_BOT_TOKEN}/setWebhook" \
-            -H "Content-Type: application/json" \
-            -d "{\"url\":\"${ENV_PUBLIC_BASE_URL}/api/telegram/coach/webhook/${ENV_COACH_TELEGRAM_WEBHOOK_SECRET}\"}" || echo "curl_failed")
-          if echo "${CRESULT}" | grep -q '"ok":true'; then
-            echo "✓ Coach Telegram webhook registered"
-          else
-            echo "⚠️  Coach Telegram webhook registration may have failed: ${CRESULT}"
           fi
           echo "::endgroup::"
