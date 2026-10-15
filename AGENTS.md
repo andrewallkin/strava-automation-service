@@ -14,6 +14,7 @@ Instructions for AI agents working on this codebase.
 
 ## Testing
 
-- **All testing must run inside Docker containers.** Do not run `pytest`, `npm test`, `vitest`, or similar directly on the host.
-- Use `docker compose run` or `docker compose exec` to run tests inside the appropriate service container.
-- Example: `docker compose run --rm api pytest tests/` for backend tests.
+- **Never install dependencies on the user's local machine.** CI runs backend tests with pip + pytest on the GitHub Actions runner (see `.github/workflows/deploy.yml`).
+- For a local one-off test run, use a throwaway container instead of the host Python, e.g.:
+  `docker run --rm -v "$PWD/backend":/app -w /app python:3.12-slim sh -c "pip install '.[dev]' && pytest"`
+- Frontend type checks/tests also go in a container, e.g. `docker run --rm -v "$PWD/frontend":/app -w /app node:22-alpine sh -c "npm ci && npm run build"`.

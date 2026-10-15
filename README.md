@@ -2,10 +2,11 @@
 
 Docker-only Strava + Telegram automation with:
 - FastAPI API (webhook processing in-process)
-- PostgreSQL
+- PostgreSQL (external `postgres-net` network)
 - React/TypeScript dashboard
+- MCP server (same backend image)
 
-No local dependency installs are required beyond Docker/Compose.
+No local dependency installs are required.
 
 ## Required Values
 
@@ -16,29 +17,36 @@ cp .env.example .env
 ```
 
 Minimum required values:
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`
 - `STRAVA_CLIENT_ID`
 - `STRAVA_CLIENT_SECRET`
 - `STRAVA_WEBHOOK_VERIFY_TOKEN`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_WEBHOOK_SECRET`
 - `TELEGRAM_ALLOWED_USER_ID`
-- `COACH_TELEGRAM_BOT_TOKEN`
-- `COACH_TELEGRAM_WEBHOOK_SECRET`
-- `COACH_TELEGRAM_ALLOWED_USER_ID`
 - `PUBLIC_BASE_URL`
-- `MCP_SERVER_URL`
-- `STRAVA_MCP_BEARER`
 - `APP_SECRET_KEY`
 
-Telegram webhook URLs are derived automatically from `PUBLIC_BASE_URL`:
+The Telegram webhook URL is derived from `PUBLIC_BASE_URL`:
 - activity admin bot: `/api/telegram/activityadmin/webhook/{TELEGRAM_WEBHOOK_SECRET}`
-- coach bot: `/api/telegram/coach/webhook/{COACH_TELEGRAM_WEBHOOK_SECRET}`
 
-## VPS Deployment
+## Deployment
 
-Push to `main` to deploy. The GitHub Actions workflow builds, deploys to your VPS, runs migrations, and registers Strava + Telegram webhooks automatically.
+CI (`.github/workflows/deploy.yml`) builds and pushes `api`, `frontend`, and `mcp` images to Docker Hub on every push to `main`. It does NOT touch the VPS.
 
-See [docs/VPS-DEPLOYMENT.md](docs/VPS-DEPLOYMENT.md) for full setup (domain, TLS, Strava API settings, etc.).
+The VPS control panel deploys this repo in `image` mode: it manages `.env` on the VPS, pulls the images by tag, runs migrations via `docker compose run --rm --no-deps api bash /app/run_migrations.sh`, starts `docker compose up -d`, and health-checks `/api/health`. Services: `api`, `frontend`, `mcp` on the external `postgres-net` network, with host ports `BACKEND_PORT`, `FRONTEND_PORT`, `MCP_PORT`.
+
+## Webhook Registration
+
+Strava push subscription and Telegram `setWebhook` are NOT registered by CI. After each deploy (or whenever `PUBLIC_BASE_URL` changes), run:
+
+```sh
+cd /srv/apps/strava-automation-service
+set -a; . ./.env; set +a
+./scripts/register_webhooks.sh
+```
+
+The script reads `PUBLIC_BASE_URL`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_WEBHOOK_VERIFY_TOKEN`, and `ACTIVITYADMIN_TELEGRAM_BOT_TOKEN`/`ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET` (or `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET`) from the environment.
 
 ## Notes
 
