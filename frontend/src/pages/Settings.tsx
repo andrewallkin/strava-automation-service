@@ -11,6 +11,7 @@ import {
   retryActivity,
   updateSettings
 } from "../lib/api";
+import { usePolling } from "../lib/usePolling";
 import {
   ActivityFeed,
   GymConsistencyCalendar,
@@ -58,22 +59,20 @@ type SettingsProps = {
 };
 
 export function Settings({ status, onStatusChange }: SettingsProps) {
-  const [localStatus, setLocalStatus] = useState<Status>(status);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(
+    () =>
+      new URLSearchParams(window.location.search).get("strava") === "connected"
+        ? "Strava connected successfully."
+        : null,
+  );
   const [summary, setSummary] = useState<Summary | null>(null);
   const [pending, setPending] = useState<PendingActivity[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
 
-  // Sync incoming status changes (e.g. after reconnect)
-  useEffect(() => {
-    setLocalStatus(status);
-  }, [status]);
-
-  // Handle ?strava=connected message on mount
+  // Strip the ?strava=connected query param once it has been consumed above
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("strava") === "connected") {
-      setMessage("Strava connected successfully.");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -89,17 +88,12 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
     }
   }, []);
 
-  useEffect(() => {
-    loadDashboard();
-    const t = window.setInterval(loadDashboard, 5000);
-    return () => window.clearInterval(t);
-  }, [loadDashboard]);
+  usePolling(loadDashboard, 5000);
 
   const handleToggle = async (key: "run_shoe_enabled" | "gym_hide_enabled", value: boolean) => {
     try {
       const updated = await updateSettings({ [key]: value });
-      const next = { ...localStatus, ...updated };
-      setLocalStatus(next);
+      const next = { ...status, ...updated };
       onStatusChange(next);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to update");
@@ -130,16 +124,16 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
 
           {/* Right: profile pic, name, logout */}
           <div className="flex items-center gap-3">
-            {localStatus.athlete_profile_url && (
+            {status.athlete_profile_url && (
               <img
-                src={localStatus.athlete_profile_url}
+                src={status.athlete_profile_url}
                 alt="Profile"
                 className="h-8 w-8 rounded-full object-cover border border-gray-200"
               />
             )}
-            {localStatus.athlete_name && (
+            {status.athlete_name && (
               <span className="hidden sm:block text-sm font-medium text-gray-700">
-                {localStatus.athlete_name}
+                {status.athlete_name}
               </span>
             )}
             <button
@@ -187,7 +181,7 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
                 </div>
                 <Toggle
                   id="run-shoe-toggle"
-                  checked={localStatus.run_shoe_enabled}
+                  checked={status.run_shoe_enabled}
                   onChange={(val) => handleToggle("run_shoe_enabled", val)}
                 />
               </div>
@@ -201,7 +195,7 @@ export function Settings({ status, onStatusChange }: SettingsProps) {
                 </div>
                 <Toggle
                   id="gym-hide-toggle"
-                  checked={localStatus.gym_hide_enabled}
+                  checked={status.gym_hide_enabled}
                   onChange={(val) => handleToggle("gym_hide_enabled", val)}
                 />
               </div>

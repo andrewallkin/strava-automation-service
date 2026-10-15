@@ -61,7 +61,7 @@ function parseJsonInput(value: string, label: string, requireObject = false): un
     return parsed;
   } catch (err) {
     if (err instanceof SyntaxError) {
-      throw new Error(`${label} is not valid JSON.`);
+      throw new Error(`${label} is not valid JSON.`, { cause: err });
     }
     throw err;
   }

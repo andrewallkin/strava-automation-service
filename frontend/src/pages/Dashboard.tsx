@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   EventRow,
   GymCalendar,
@@ -19,6 +19,7 @@ import {
   retryActivity
 } from "../lib/api";
 import { formatMovingTime } from "../lib/formatMovingTime";
+import { usePolling } from "../lib/usePolling";
 import { formatStravaLocalDateTime, formatUserDateTime } from "../lib/datetimeDisplay";
 
 function formatEventType(eventType: string): string {
@@ -354,6 +355,12 @@ export function ShoeVault({ className }: { className?: string }) {
   );
 }
 
+function Trend({ thisVal, lastVal }: { thisVal: number; lastVal: number }) {
+  if (thisVal > lastVal) return <span className="text-green-500 text-xs">↑</span>;
+  if (thisVal < lastVal) return <span className="text-red-500 text-xs">↓</span>;
+  return <span className="text-gray-400 text-xs">—</span>;
+}
+
 function formatRunPace(km: number, seconds: number): string {
   if (!km || !seconds) return "";
   const paceSecPerKm = seconds / km;
@@ -376,12 +383,6 @@ export function WeeklyTrainingSummary({ className }: { className?: string }) {
 
   const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
   const FULL_DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-  function Trend({ thisVal, lastVal }: { thisVal: number; lastVal: number }) {
-    if (thisVal > lastVal) return <span className="text-green-500 text-xs">↑</span>;
-    if (thisVal < lastVal) return <span className="text-red-500 text-xs">↓</span>;
-    return <span className="text-gray-400 text-xs">—</span>;
-  }
 
   const maxKm = data ? Math.max(...data.this_week.days.map((d) => d.km), 0.1) : 1;
 
@@ -585,7 +586,7 @@ export function GymConsistencyCalendar() {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
-  function buildCalendar(year: number, month: number, gymDays: Set<string>) {
+  function buildCalendar(year: number, month: number) {
     const firstDay = new Date(year, month - 1, 1);
     // Shift so Mon=0
     const offset = (firstDay.getDay() + 6) % 7;
@@ -617,7 +618,7 @@ export function GymConsistencyCalendar() {
           </div>
           {(() => {
             const gymSet = new Set(data.gym_days);
-            const { offset, daysInMonth } = buildCalendar(data.year, data.month, gymSet);
+            const { offset, daysInMonth } = buildCalendar(data.year, data.month);
             const cells: (number | null)[] = [
               ...Array(offset).fill(null),
               ...Array.from({ length: daysInMonth }, (_, i) => i + 1)
@@ -665,7 +666,7 @@ export function Dashboard() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  async function load(): Promise<void> {
+  const load = useCallback(async (): Promise<void> => {
     try {
       const [s, p, e] = await Promise.all([fetchSummary(), fetchPending(), fetchEvents()]);
       setSummary(s);
@@ -675,13 +676,9 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     }
-  }
-
-  useEffect(() => {
-    load();
-    const t = window.setInterval(load, 5000);
-    return () => window.clearInterval(t);
   }, []);
+
+  usePolling(load, 5000);
 
   return (
     <div className="min-h-screen bg-gray-50">

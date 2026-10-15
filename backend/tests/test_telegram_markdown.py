@@ -10,7 +10,7 @@ def test_escape_markdown_v2_empty() -> None:
 
 
 def test_escape_markdown_v2_dots_parens_exclamation() -> None:
-    assert escape_markdown_v2("12.34km (easy)!") == r"12\.34km \(easy\)!"
+    assert escape_markdown_v2("12.34km (easy)!") == r"12\.34km \(easy\)\!"
 
 
 def test_escape_markdown_v2_reserved_in_activity_title() -> None:
