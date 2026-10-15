@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityTypeWeekCard } from "../components/ActivityTypeWeekCard";
 import { LatestActivitiesCard } from "../components/LatestActivitiesCard";
 import { Summary, fetchSummary } from "../lib/api";
+import { usePolling } from "../lib/usePolling";
 import { ShoeVault, StatsGrid } from "./Dashboard";
 
 export function HomePage() {
@@ -15,11 +16,7 @@ export function HomePage() {
     }
   }, []);
 
-  useEffect(() => {
-    loadSummary();
-    const t = window.setInterval(loadSummary, 5000);
-    return () => window.clearInterval(t);
-  }, [loadSummary]);
+  usePolling(loadSummary, 5000);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { usePolling } from "../lib/usePolling";
 import {
   BackfillJob,
   BackfillRun,
@@ -133,9 +134,9 @@ export function IngestionPage() {
     }
   }, [loadActivities]);
 
-  useEffect(() => {
-    loadActivities().catch(() => setMessage("Could not load ingested activities."));
-  }, [loadActivities]);
+  const onActivitiesError = useCallback(() => setMessage("Could not load ingested activities."), []);
+
+  usePolling(loadActivities, null, onActivitiesError);
 
   useEffect(() => {
     Promise.all([fetchLatestBackfill(), fetchBackfillHistory()])

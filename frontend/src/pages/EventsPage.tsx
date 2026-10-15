@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { EventRow, fetchEvents } from "../lib/api";
 import { formatUserDateTime } from "../lib/datetimeDisplay";
+import { usePolling } from "../lib/usePolling";
 
 function formatEventType(eventType: string): string {
   return eventType
@@ -33,11 +34,7 @@ export function EventsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-    const t = window.setInterval(load, 5000);
-    return () => window.clearInterval(t);
-  }, [load]);
+  usePolling(load, 5000);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">

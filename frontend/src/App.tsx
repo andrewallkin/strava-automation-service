@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Status, fetchStatus } from "./lib/api";
+import { usePolling } from "./lib/usePolling";
 import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { EventsPage } from "./pages/EventsPage";
 import { HomePage } from "./pages/HomePage";
@@ -22,9 +23,7 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
+  usePolling(loadStatus);
 
   // Handle ?strava=connected message
   useEffect(() => {

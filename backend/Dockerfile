@@ -10,9 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . /app
-RUN pip install --no-cache-dir .
-RUN chmod +x /app/run_migrations.sh
+COPY pyproject.toml ./
+COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./
+COPY run_migrations.sh ./
+RUN pip install --no-cache-dir . \
+    && chmod +x /app/run_migrations.sh
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

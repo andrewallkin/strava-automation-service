@@ -1,34 +1,38 @@
 services:
   api:
-    build:
-      context: ./backend
+    image: andrewallkin/strava-automation-service:${DOCKER_IMAGE_API}
+    env_file: [.env]
     ports:
-      - "${BACKEND_PORT:-8002}:8000"
-    env_file:
-      - .env
-    restart: always
+      - "127.0.0.1:${BACKEND_PORT:-8002}:8000"
+    depends_on: []
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks: [default, postgres-net]
+    restart: always
 
   frontend:
-    build:
-      context: ./frontend
+    image: andrewallkin/strava-automation-service:${DOCKER_IMAGE_FRONTEND}
     ports:
-      - "${FRONTEND_PORT:-3002}:80"
+      - "127.0.0.1:${FRONTEND_PORT:-3002}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: always
     networks: [default]
 
   mcp:
-    build:
-      context: ./backend
+    image: andrewallkin/strava-automation-service:${DOCKER_IMAGE_MCP}
     command: ["python", "-m", "app.mcp.server"]
     ports:
-      - "${MCP_PORT:-8004}:8000"
+      - "127.0.0.1:${MCP_PORT:-8004}:8000"
     depends_on:
-      - api
-    env_file:
-      - .env
+      api:
+        condition: service_healthy
+    env_file: [.env]
     restart: always
     networks: [default, postgres-net]
 

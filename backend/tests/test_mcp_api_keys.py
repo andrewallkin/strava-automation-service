@@ -29,7 +29,7 @@ def test_create_mcp_api_key_stores_hash_only() -> None:
     assert stored[0].name == "Claude"
     assert stored[0].key_hash == hash_mcp_api_key(created.raw_key)
     assert stored[0].key_hash != created.raw_key
-    assert stored[0].key_prefix == "sva_mcp_raw-sec"
+    assert stored[0].key_prefix == "sva_mcp_raw-secr"
     db.commit.assert_called_once()
     db.refresh.assert_called_once_with(stored[0])
 
