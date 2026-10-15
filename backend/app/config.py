@@ -68,6 +68,12 @@ class Settings(BaseSettings):
             return ""
         return f"{self._normalized_public_base_url}/api/telegram/activityadmin/webhook/{self.telegram_webhook_secret}"
 
+    @property
+    def strava_webhook_url(self) -> str:
+        if not self.public_base_url:
+            return ""
+        return f"{self._normalized_public_base_url}/api/strava/webhook"
+
 
 @lru_cache
 def get_settings() -> Settings:

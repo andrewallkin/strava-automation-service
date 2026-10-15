@@ -38,15 +38,15 @@ The VPS control panel deploys this repo in `image` mode: it manages `.env` on th
 
 ## Webhook Registration
 
-Strava push subscription and Telegram `setWebhook` are NOT registered by CI. After each deploy (or whenever `PUBLIC_BASE_URL` changes), run:
+The API registers its webhooks automatically at startup. On boot it spawns a background task that idempotently registers the Strava push subscription and the Telegram `setWebhook` (replacing a stale Strava subscription whose callback URL no longer matches `PUBLIC_BASE_URL`), and retries with backoff (30s → 1m → 5m capped) until both succeed — Strava validates the callback URL with a hub.challenge request at creation time, so registration keeps retrying until the public URL is live. Failures never block startup, and registration is skipped when `PUBLIC_BASE_URL` is unset, `APP_ENV=development`, or the relevant credentials are missing.
+
+`scripts/register_webhooks.sh` remains as a manual fallback (e.g. after rotating `STRAVA_WEBHOOK_VERIFY_TOKEN`):
 
 ```sh
 cd /srv/apps/strava-automation-service
 set -a; . ./.env; set +a
 ./scripts/register_webhooks.sh
 ```
-
-The script reads `PUBLIC_BASE_URL`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_WEBHOOK_VERIFY_TOKEN`, and `ACTIVITYADMIN_TELEGRAM_BOT_TOKEN`/`ACTIVITYADMIN_TELEGRAM_WEBHOOK_SECRET` (or `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET`) from the environment.
 
 ## Notes
 

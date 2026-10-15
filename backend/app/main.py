@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import logging.config
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -44,7 +46,22 @@ def _configure_logging() -> None:
 
 _configure_logging()
 
-app = FastAPI(title="Strava Automation Service")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    from app.config import get_settings
+    from app.services.webhook_registration import ensure_webhooks_registered
+
+    registration_task = asyncio.create_task(ensure_webhooks_registered(get_settings()))
+    try:
+        yield
+    finally:
+        registration_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await registration_task
+
+
+app = FastAPI(title="Strava Automation Service", lifespan=lifespan)
 
 from app.routers.auth import logout_router, router as auth_router
 from app.routers.backfill_api import router as backfill_router
