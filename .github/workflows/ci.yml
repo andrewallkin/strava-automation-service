@@ -35,7 +35,7 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: "5432"
           APP_SECRET_KEY: test-secret-test-secret-test-secret
-        run: pytest
+        run: uv run pytest
 
   frontend:
     name: Frontend checks

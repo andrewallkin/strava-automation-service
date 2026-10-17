@@ -31,7 +31,7 @@ jobs:
           APP_SECRET_KEY: test-secret-test-secret-test-secret
         run: |
           uv sync --frozen --extra dev
-          pytest
+          uv run pytest
 
   build:
     needs: test
