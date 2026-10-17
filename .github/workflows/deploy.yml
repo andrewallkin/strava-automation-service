@@ -14,12 +14,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/pyproject.toml
+          enable-cache: true
 
       - name: Backend tests
         working-directory: backend
@@ -31,7 +30,7 @@ jobs:
           POSTGRES_PORT: "5432"
           APP_SECRET_KEY: test-secret-test-secret-test-secret
         run: |
-          pip install --no-cache-dir ".[dev]"
+          uv sync --frozen --extra dev
           pytest
 
   build:
