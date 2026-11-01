@@ -91,7 +91,7 @@ def test_jwt_service_uses_new_env_names_and_fixed_cookie_shape(
     get_settings.cache_clear()
     try:
         service = JwtService()
-        assert service.secret == "unit-test-secret"
+        assert service.secret == "unit-test-secret-unit-test-secret-unit-test"
         assert service.cookie_name == AUTH_COOKIE_NAME == "strava_auth"
         assert AUTH_COOKIE_SAMESITE == "lax"
 
