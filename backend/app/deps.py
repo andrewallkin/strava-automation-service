@@ -2,16 +2,14 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db import get_db
 from app.models import User
-from app.services.jwt_service import JwtService
+from app.services.jwt_service import AUTH_COOKIE_NAME, JwtService
 
 
 def require_jwt_payload(request: Request) -> dict:
     """Validate JWT from auth cookie and return payload."""
-    settings = get_settings()
-    token = request.cookies.get(settings.jwt_cookie_name)
+    token = request.cookies.get(AUTH_COOKIE_NAME)
     if not token:
         raise HTTPException(status_code=401, detail="Session expired or not authenticated")
     service = JwtService()

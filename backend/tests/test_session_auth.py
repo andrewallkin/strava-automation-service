@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.db import get_db
 from app.main import app
+from app.services.jwt_service import AUTH_COOKIE_NAME
 
 
 def _make_jwt(user_id: int, exp_seconds: int = 120) -> str:
@@ -20,7 +21,7 @@ def _make_jwt(user_id: int, exp_seconds: int = 120) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(seconds=exp_seconds)).timestamp()),
     }
-    secret = settings.jwt_secret or settings.app_secret_key
+    secret = settings.jwt_secret_key or settings.app_secret_key
     return jwt.encode(payload, secret, algorithm=settings.jwt_algorithm)
 
 
@@ -49,7 +50,7 @@ def test_fast_login_sets_jwt_cookie_when_user_connected() -> None:
         assert response.status_code == 200
         assert response.json() == {"ok": True}
         settings = get_settings()
-        assert settings.jwt_cookie_name in response.headers.get("set-cookie", "")
+        assert AUTH_COOKIE_NAME in response.headers.get("set-cookie", "")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -89,7 +90,7 @@ def test_ui_status_returns_200_with_valid_jwt() -> None:
     try:
         client = TestClient(app)
         settings = get_settings()
-        client.cookies.set(settings.jwt_cookie_name, _make_jwt(1))
+        client.cookies.set(AUTH_COOKIE_NAME, _make_jwt(1))
         response = client.get("/api/ui/status")
         assert response.status_code == 200
         assert response.json()["connected"] is True
@@ -110,7 +111,7 @@ def test_ui_status_returns_401_with_expired_jwt() -> None:
     try:
         client = TestClient(app)
         settings = get_settings()
-        client.cookies.set(settings.jwt_cookie_name, _make_jwt(1, exp_seconds=-1))
+        client.cookies.set(AUTH_COOKIE_NAME, _make_jwt(1, exp_seconds=-1))
         response = client.get("/api/ui/status")
         assert response.status_code == 401
     finally:
@@ -130,7 +131,7 @@ def test_callback_sets_jwt_cookie() -> None:
         )
     settings = get_settings()
     assert response.status_code in (302, 307)
-    assert settings.jwt_cookie_name in response.headers.get("set-cookie", "")
+    assert AUTH_COOKIE_NAME in response.headers.get("set-cookie", "")
 
 
 def test_logout_clears_jwt_and_keeps_strava_tokens() -> None:
@@ -155,13 +156,13 @@ def test_logout_clears_jwt_and_keeps_strava_tokens() -> None:
     try:
         client = TestClient(app)
         settings = get_settings()
-        client.cookies.set(settings.jwt_cookie_name, _make_jwt(1))
+        client.cookies.set(AUTH_COOKIE_NAME, _make_jwt(1))
 
         logout_response = client.post("/api/auth/logout")
         assert logout_response.status_code == 200
         assert logout_response.json() == {"logged_out": True}
         set_cookie = logout_response.headers.get("set-cookie", "")
-        assert settings.jwt_cookie_name in set_cookie
+        assert AUTH_COOKIE_NAME in set_cookie
         assert "Max-Age=0" in set_cookie or "expires=" in set_cookie
 
         client.cookies.clear()

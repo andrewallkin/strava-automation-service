@@ -37,3 +37,6 @@ postgres_data/
 
 # Local agent design notes (not part of the app)
 docs/superpowers/
+
+# Git worktrees
+.worktrees/
