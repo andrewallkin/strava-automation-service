@@ -73,15 +73,21 @@ def test_cors_origin_list_empty_by_default() -> None:
 
 
 def test_dropped_cookie_vars_are_not_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = _settings_with(monkeypatch, JWT_COOKIE_NAME="legacy", JWT_COOKIE_DOMAIN="example.com")
+    settings = _settings_with(
+        monkeypatch,
+        JWT_COOKIE_NAME="legacy",
+        JWT_COOKIE_DOMAIN="example.com",
+        JWT_COOKIE_SAMESITE="strict",
+    )
     assert not hasattr(settings, "jwt_cookie_name")
+    assert not hasattr(settings, "jwt_cookie_samesite")
     assert not hasattr(settings, "jwt_cookie_domain")
 
 
 def test_jwt_service_uses_new_env_names_and_fixed_cookie_shape(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("JWT_SECRET_KEY", "unit-test-secret")
+    monkeypatch.setenv("JWT_SECRET_KEY", "unit-test-secret-unit-test-secret-unit-test")
     get_settings.cache_clear()
     try:
         service = JwtService()
@@ -154,10 +160,13 @@ def test_cors_middleware_mounted_with_configured_origins(
 
 
 def test_mcp_server_exposes_fastmcp_instance_with_auth() -> None:
+    from fastmcp.server.auth.providers.debug import DebugTokenVerifier
+
     from app.mcp import server
 
     assert server.mcp is not None
     assert server.mcp.name == "strava-automation-service"
+    assert isinstance(server.mcp.auth, DebugTokenVerifier)
 
 
 def test_mcp_configured_timezone_falls_back_to_utc(monkeypatch: pytest.MonkeyPatch) -> None:
