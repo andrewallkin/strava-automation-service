@@ -4,9 +4,25 @@ import logging.config
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.external_errors import ExternalAPIError
+
+
+def _add_cors_middleware(application: FastAPI) -> None:
+    from app.config import get_settings
+
+    origins = get_settings().cors_origin_list
+    if not origins:
+        return
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
 
 
 def _configure_logging() -> None:
@@ -62,6 +78,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Strava Automation Service", lifespan=lifespan)
+_add_cors_middleware(app)
 
 from app.routers.auth import logout_router, router as auth_router
 from app.routers.backfill_api import router as backfill_router

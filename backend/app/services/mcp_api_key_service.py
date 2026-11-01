@@ -24,7 +24,7 @@ class CreatedMcpApiKey:
 
 def hash_mcp_api_key(raw_key: str) -> str:
     settings = get_settings()
-    secret = settings.jwt_secret or settings.app_secret_key or "dev-mcp-api-key-secret"
+    secret = settings.jwt_secret_key or settings.app_secret_key or "dev-mcp-api-key-secret"
     return hmac.new(secret.encode("utf-8"), raw_key.encode("utf-8"), hashlib.sha256).hexdigest()
 
 

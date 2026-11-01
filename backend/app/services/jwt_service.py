@@ -8,21 +8,24 @@ from jwt import InvalidTokenError
 from app.config import get_settings
 from app.models import User
 
+AUTH_COOKIE_NAME = "strava_auth"
+AUTH_COOKIE_SAMESITE = "lax"
+
 
 class JwtService:
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.secret = self.settings.jwt_secret or self.settings.app_secret_key
+        self.secret = self.settings.jwt_secret_key or self.settings.app_secret_key
         if not self.secret:
-            raise ValueError("JWT secret is required. Set JWT_SECRET or APP_SECRET_KEY.")
+            raise ValueError("JWT secret is required. Set JWT_SECRET_KEY or APP_SECRET_KEY.")
         self.algorithm = self.settings.jwt_algorithm
-        self.cookie_name = self.settings.jwt_cookie_name
+        self.cookie_name = AUTH_COOKIE_NAME
 
     def issue_token(self, user: User) -> str:
         if not user.id:
             raise ValueError("Cannot issue token without user id")
         now = datetime.now(UTC)
-        exp = now + timedelta(minutes=self.settings.jwt_exp_minutes)
+        exp = now + timedelta(minutes=self.settings.jwt_access_token_expire_minutes)
         payload = {
             "sub": str(user.id),
             "strava_id": user.strava_athlete_id,
@@ -43,19 +46,19 @@ class JwtService:
             key=self.cookie_name,
             value=token,
             httponly=True,
-            secure=self.settings.jwt_cookie_secure,
-            samesite=self.settings.jwt_cookie_samesite,
-            max_age=self.settings.jwt_exp_minutes * 60,
-            domain=self.settings.jwt_cookie_domain or None,
+            secure=self.settings.cookie_secure,
+            samesite=AUTH_COOKIE_SAMESITE,
+            max_age=self.settings.jwt_access_token_expire_minutes * 60,
+            domain=None,
             path="/",
         )
 
     def clear_auth_cookie(self, response: Response) -> None:
         response.delete_cookie(
             key=self.cookie_name,
-            domain=self.settings.jwt_cookie_domain or None,
+            domain=None,
             path="/",
             httponly=True,
-            secure=self.settings.jwt_cookie_secure,
-            samesite=self.settings.jwt_cookie_samesite,
+            secure=self.settings.cookie_secure,
+            samesite=AUTH_COOKIE_SAMESITE,
         )
