@@ -19,6 +19,7 @@ build/
 venv/
 
 # Node / frontend
+scripts/node_modules/
 frontend/node_modules/
 frontend/dist/
 *.tsbuildinfo

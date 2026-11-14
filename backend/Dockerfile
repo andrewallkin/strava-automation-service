@@ -15,6 +15,7 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY run_migrations.sh ./
+COPY scripts ./scripts
 RUN pip install --no-cache-dir . \
     && chmod +x /app/run_migrations.sh
 

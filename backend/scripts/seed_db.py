@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Insert fictional demo data for local screenshots (no Strava or Telegram calls)."""
+
+from __future__ import annotations
+
+import argparse
+from datetime import UTC, date, datetime, timedelta
+
+from sqlalchemy import delete, or_, select
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+from app.db import SessionLocal
+from app.models import (
+    EventLog,
+    StravaActivity,
+    StravaIngestionJob,
+    User,
+)
+
+DEFAULT_DEMO_ATHLETE_ID = 9_900_001
+
+
+def _demo_athlete_id() -> int:
+    allowed = get_settings().strava_allowed_athlete_id
+    if allowed:
+        return allowed
+    return DEFAULT_DEMO_ATHLETE_ID
+
+
+DEMO_ACTIVITY_IDS = (9_901_001, 9_901_002, 9_901_003, 9_901_004, 9_901_005)
+
+
+def _dt(days_ago: int, hour: int = 7) -> datetime:
+    base = datetime.now(UTC).replace(hour=hour, minute=30, second=0, microsecond=0)
+    return base - timedelta(days=days_ago)
+
+
+def _local_date(d: datetime) -> date:
+    return d.astimezone(UTC).date()
+
+
+def clear_demo_data(db: Session, athlete_id: int) -> None:
+    settings = get_settings()
+    clauses = [
+        User.strava_athlete_id == athlete_id,
+        User.strava_athlete_id == DEFAULT_DEMO_ATHLETE_ID,
+        User.refresh_token == "demo-local-refresh-token",
+    ]
+    if settings.telegram_allowed_user_id:
+        clauses.append(User.telegram_user_id == settings.telegram_allowed_user_id)
+    for user in db.scalars(select(User).where(or_(*clauses))).all():
+        db.delete(user)
+    for activity_id in DEMO_ACTIVITY_IDS:
+        db.execute(delete(StravaActivity).where(StravaActivity.activity_id == activity_id))
+    db.execute(delete(EventLog).where(EventLog.correlation_id == "demo-seed"))
+    db.execute(delete(StravaIngestionJob).where(StravaIngestionJob.activity_id.in_(DEMO_ACTIVITY_IDS)))
+    db.commit()
+
+
+def seed_demo_data(db: Session) -> None:
+    settings = get_settings()
+    athlete_id = _demo_athlete_id()
+    clear_demo_data(db, athlete_id)
+
+    telegram_user_id = settings.telegram_allowed_user_id or 9_100_001
+    user = User(
+        strava_athlete_id=athlete_id,
+        telegram_user_id=telegram_user_id,
+        access_token=None,
+        refresh_token="demo-local-refresh-token",
+        expires_at=datetime.now(UTC) + timedelta(days=30),
+        run_shoe_enabled=True,
+        gym_hide_enabled=True,
+        athlete_name="Alex Demo",
+        athlete_profile_url=None,
+    )
+    db.add(user)
+    db.flush()
+
+    activities = [
+        ("Morning Loop at Fictional Park", "Run", 8_200.0, 2_520),
+        ("Hill Repeats on Demo Ridge", "TrailRun", 6_500.0, 2_100),
+        ("Easy Recovery Jog", "Run", 5_000.0, 1_800),
+        ("Strength Session (hidden from home)", "WeightTraining", 0.0, 3_600),
+        ("Lakefront Long Run", "Run", 14_200.0, 4_800),
+    ]
+
+    for index, (name, sport, distance_m, moving_time) in enumerate(activities):
+        start = _dt(index, hour=6 + index)
+        local = _local_date(start)
+        activity_id = DEMO_ACTIVITY_IDS[index]
+        db.add(
+            StravaActivity(
+                activity_id=activity_id,
+                athlete_id=athlete_id,
+                name=name,
+                description="Synthetic activity for local documentation screenshots.",
+                activity_type=sport,
+                sport_type=sport,
+                start_date=start,
+                start_date_local=start,
+                timezone="UTC",
+                local_date=local,
+                local_year=local.year,
+                local_month=local.month,
+                local_week=local.isocalendar().week,
+                distance_m=distance_m,
+                moving_time_seconds=moving_time,
+                elapsed_time_seconds=moving_time + 120,
+                total_elevation_gain_m=45.0 if sport == "Run" else 120.0,
+                average_speed_mps=(distance_m / moving_time) if distance_m and moving_time else None,
+                average_heartrate_bpm=142.0 if sport.endswith("Run") else 118.0,
+                has_heartrate=True,
+                trainer=sport == "WeightTraining",
+                hide_from_home=sport == "WeightTraining",
+                data_quality={},
+                detail_data={},
+            )
+        )
+        db.add(
+            StravaIngestionJob(
+                activity_id=activity_id,
+                athlete_id=athlete_id,
+                trigger_type="webhook",
+                aspect_type="create",
+                status="succeeded",
+                attempt_count=1,
+                queued_at=start,
+                started_at=start,
+                completed_at=start + timedelta(seconds=4),
+            )
+        )
+
+    now = datetime.now(UTC)
+    events = [
+        ("run_action", "ok", "Assigned fictional shoes for Morning Loop at Fictional Park"),
+        ("gym_action", "ok", "Set hide_from_home on Strength Session (hidden from home)"),
+        ("ingestion", "ok", "Ingested Lakefront Long Run into local store"),
+        ("telegram", "ok", "Processed demo shoe-picker callback (synthetic)"),
+    ]
+    for index, (event_type, status, message) in enumerate(events):
+        db.add(
+            EventLog(
+                event_type=event_type,
+                status=status,
+                message=message,
+                correlation_id="demo-seed",
+                created_at=now - timedelta(minutes=30 - index * 5),
+            )
+        )
+
+    db.commit()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Seed fictional Strava automation demo data")
+    parser.add_argument("--reset", action="store_true", help="Remove demo rows only")
+    args = parser.parse_args()
+
+    db = SessionLocal()
+    athlete_id = _demo_athlete_id()
+    try:
+        if args.reset:
+            clear_demo_data(db, athlete_id)
+            print("Demo data removed.")
+            return
+        seed_demo_data(db)
+        athlete_id = _demo_athlete_id()
+        print(f"Seeded connected athlete {athlete_id} with activities, events, and ingestion rows.")
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,5 @@
+# Production contract for the VPS control panel (image mode, external Postgres).
+
 services:
   api:
     image: andrewallkin/strava-automation-service:${DOCKER_IMAGE_API}
