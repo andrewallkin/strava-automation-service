@@ -9,7 +9,6 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db import SessionLocal
 from app.models import (
     EventLog,
@@ -20,17 +19,8 @@ from app.models import (
 )
 
 DEMO_GEAR_IDS = ("demo-shoe-cloudline", "demo-shoe-park")
-
-DEFAULT_DEMO_ATHLETE_ID = 9_900_001
-
-
-def _demo_athlete_id() -> int:
-    allowed = get_settings().strava_allowed_athlete_id
-    if allowed:
-        return allowed
-    return DEFAULT_DEMO_ATHLETE_ID
-
-
+DEMO_ATHLETE_ID = 9_900_001
+DEMO_TELEGRAM_USER_ID = 9_100_001
 DEMO_ACTIVITY_IDS = (9_901_001, 9_901_002, 9_901_003, 9_901_004, 9_901_005)
 
 
@@ -43,15 +33,12 @@ def _local_date(d: datetime) -> date:
     return d.astimezone(UTC).date()
 
 
-def clear_demo_data(db: Session, athlete_id: int) -> None:
-    settings = get_settings()
+def clear_demo_data(db: Session) -> None:
     clauses = [
-        User.strava_athlete_id == athlete_id,
-        User.strava_athlete_id == DEFAULT_DEMO_ATHLETE_ID,
+        User.strava_athlete_id == DEMO_ATHLETE_ID,
+        User.telegram_user_id == DEMO_TELEGRAM_USER_ID,
         User.refresh_token == "demo-local-refresh-token",
     ]
-    if settings.telegram_allowed_user_id:
-        clauses.append(User.telegram_user_id == settings.telegram_allowed_user_id)
     for user in db.scalars(select(User).where(or_(*clauses))).all():
         db.delete(user)
     for activity_id in DEMO_ACTIVITY_IDS:
@@ -63,14 +50,12 @@ def clear_demo_data(db: Session, athlete_id: int) -> None:
 
 
 def seed_demo_data(db: Session) -> None:
-    settings = get_settings()
-    athlete_id = _demo_athlete_id()
-    clear_demo_data(db, athlete_id)
+    clear_demo_data(db)
 
-    telegram_user_id = settings.telegram_allowed_user_id or 9_100_001
+    athlete_id = DEMO_ATHLETE_ID
     user = User(
         strava_athlete_id=athlete_id,
-        telegram_user_id=telegram_user_id,
+        telegram_user_id=DEMO_TELEGRAM_USER_ID,
         access_token=None,
         refresh_token="demo-local-refresh-token",
         expires_at=datetime.now(UTC) + timedelta(days=30),
@@ -186,15 +171,13 @@ def main() -> None:
     args = parser.parse_args()
 
     db = SessionLocal()
-    athlete_id = _demo_athlete_id()
     try:
         if args.reset:
-            clear_demo_data(db, athlete_id)
+            clear_demo_data(db)
             print("Demo data removed.")
             return
         seed_demo_data(db)
-        athlete_id = _demo_athlete_id()
-        print(f"Seeded connected athlete {athlete_id} with activities, events, and ingestion rows.")
+        print("Seeded synthetic athlete Alex Demo with fictional activities, shoes, events, and ingestion rows.")
     finally:
         db.close()
 

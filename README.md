@@ -150,7 +150,11 @@ cd backend && uv sync --extra dev && uv run pytest
 cd frontend && npm ci && npm test && npm run lint && npm run typecheck
 ```
 
-**Screenshots** (standalone stack, after migrate + seed):
+**Screenshots** (standalone stack, after migrate + seed). The seed writes only fictional rows: athlete `9900001`, Telegram user `9100001`, and the name Alex Demo. It does not read `STRAVA_ALLOWED_ATHLETE_ID` or `TELEGRAM_ALLOWED_USER_ID`. For the capture, set those two variables to the fictional ids so a personal allowlist is not applied:
+
+```sh
+export STRAVA_ALLOWED_ATHLETE_ID=9900001 TELEGRAM_ALLOWED_USER_ID=9100001
+```
 
 ```sh
 docker compose -f docker-compose.standalone.yml up --build -d

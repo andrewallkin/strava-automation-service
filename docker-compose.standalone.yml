@@ -23,6 +23,8 @@ services:
       - .env
     environment:
       POSTGRES_HOST: postgres
+      STRAVA_ALLOWED_ATHLETE_ID: ${STRAVA_ALLOWED_ATHLETE_ID:-9900001}
+      TELEGRAM_ALLOWED_USER_ID: ${TELEGRAM_ALLOWED_USER_ID:-9100001}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -60,6 +62,8 @@ services:
       - .env
     environment:
       POSTGRES_HOST: postgres
+      STRAVA_ALLOWED_ATHLETE_ID: ${STRAVA_ALLOWED_ATHLETE_ID:-9900001}
+      TELEGRAM_ALLOWED_USER_ID: ${TELEGRAM_ALLOWED_USER_ID:-9100001}
     ports:
       - "127.0.0.1:${MCP_PORT:-8004}:8000"
     depends_on:
