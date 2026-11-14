@@ -41,7 +41,10 @@ async function main() {
 
   for (const shot of shots) {
     await page.goto(`${baseUrl}${shot.path}`, { waitUntil: "networkidle" });
-    await page.waitForTimeout(800);
+    if (shot.file === "hero.png") {
+      await page.getByRole("heading", { name: "Shoe Vault" }).waitFor({ timeout: 15_000 });
+    }
+    await page.waitForTimeout(400);
     await page.screenshot({
       path: path.join(imagesDir, shot.file),
       fullPage: false,

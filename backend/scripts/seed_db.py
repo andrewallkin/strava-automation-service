@@ -13,10 +13,13 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.models import (
     EventLog,
+    Gear,
     StravaActivity,
     StravaIngestionJob,
     User,
 )
+
+DEMO_GEAR_IDS = ("demo-shoe-cloudline", "demo-shoe-park")
 
 DEFAULT_DEMO_ATHLETE_ID = 9_900_001
 
@@ -55,6 +58,7 @@ def clear_demo_data(db: Session, athlete_id: int) -> None:
         db.execute(delete(StravaActivity).where(StravaActivity.activity_id == activity_id))
     db.execute(delete(EventLog).where(EventLog.correlation_id == "demo-seed"))
     db.execute(delete(StravaIngestionJob).where(StravaIngestionJob.activity_id.in_(DEMO_ACTIVITY_IDS)))
+    db.execute(delete(Gear).where(Gear.strava_gear_id.in_(DEMO_GEAR_IDS)))
     db.commit()
 
 
@@ -131,6 +135,29 @@ def seed_demo_data(db: Session) -> None:
                 completed_at=start + timedelta(seconds=4),
             )
         )
+
+    db.add_all(
+        [
+            Gear(
+                strava_gear_id="demo-shoe-cloudline",
+                name="Cloudline Racers",
+                is_default=True,
+                brand_name="Fictional",
+                model_name="Cloudline",
+                distance_m=420_000,
+                retired=False,
+            ),
+            Gear(
+                strava_gear_id="demo-shoe-park",
+                name="Park Trainers",
+                is_default=False,
+                brand_name="Fictional",
+                model_name="Park",
+                distance_m=180_000,
+                retired=False,
+            ),
+        ]
+    )
 
     now = datetime.now(UTC)
     events = [
