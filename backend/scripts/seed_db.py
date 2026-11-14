@@ -21,7 +21,17 @@ from app.models import (
 DEMO_GEAR_IDS = ("demo-shoe-cloudline", "demo-shoe-park")
 DEMO_ATHLETE_ID = 9_900_001
 DEMO_TELEGRAM_USER_ID = 9_100_001
-DEMO_ACTIVITY_IDS = (9_901_001, 9_901_002, 9_901_003, 9_901_004, 9_901_005)
+DEMO_ACTIVITY_IDS = (
+    9_901_001,
+    9_901_002,
+    9_901_003,
+    9_901_004,
+    9_901_005,
+    9_901_006,
+    9_901_007,
+    9_901_008,
+    9_901_009,
+)
 
 
 def _dt(days_ago: int, hour: int = 7) -> datetime:
@@ -68,15 +78,19 @@ def seed_demo_data(db: Session) -> None:
     db.flush()
 
     activities = [
-        ("Morning Loop at Fictional Park", "Run", 8_200.0, 2_520),
-        ("Hill Repeats on Demo Ridge", "TrailRun", 6_500.0, 2_100),
-        ("Easy Recovery Jog", "Run", 5_000.0, 1_800),
-        ("Strength Session (hidden from home)", "WeightTraining", 0.0, 3_600),
-        ("Lakefront Long Run", "Run", 14_200.0, 4_800),
+        ("Morning Loop at Fictional Park", "Run", 8_200.0, 2_520, 0),
+        ("Hill Repeats on Demo Ridge", "TrailRun", 6_500.0, 2_100, 1),
+        ("Easy Recovery Jog", "Run", 5_000.0, 1_800, 2),
+        ("Strength Session (hidden from home)", "WeightTraining", 0.0, 3_600, 3),
+        ("Lakefront Long Run", "Run", 14_200.0, 4_800, 4),
+        ("Canal Towpath Run", "Run", 7_400.0, 2_400, 8),
+        ("Demo Track Intervals", "Run", 6_000.0, 1_680, 9),
+        ("River Path Trail", "TrailRun", 9_100.0, 3_300, 10),
+        ("Last Week Long Run", "Run", 16_500.0, 5_700, 11),
     ]
 
-    for index, (name, sport, distance_m, moving_time) in enumerate(activities):
-        start = _dt(index, hour=6 + index)
+    for index, (name, sport, distance_m, moving_time, days_ago) in enumerate(activities):
+        start = _dt(days_ago, hour=6 + (index % 4))
         local = _local_date(start)
         activity_id = DEMO_ACTIVITY_IDS[index]
         db.add(

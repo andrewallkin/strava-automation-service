@@ -28,7 +28,7 @@ async function main() {
   const browser = await chromium.launch();
   const context = await browser.newContext({
     viewport,
-    deviceScaleFactor: 1,
+    deviceScaleFactor: 2,
   });
 
   const login = await context.request.post(`${baseUrl}/api/auth/login`);
