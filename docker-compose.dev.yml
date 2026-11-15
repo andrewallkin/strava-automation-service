@@ -1,0 +1,89 @@
+# Day-to-day development: bundled Postgres, hot reload, Vite frontend.
+
+services:
+  postgres:
+    image: postgres:15
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-strava_automation}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [postgres-net]
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [default, postgres-net]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    environment:
+      API_PROXY_ORIGIN: http://api:8000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    ports:
+      - "${FRONTEND_PORT:-3000}:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [default]
+
+  mcp:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.mcp.server"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    ports:
+      - "127.0.0.1:${MCP_PORT:-8004}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [default, postgres-net]
+
+volumes:
+  postgres_data:
+
+networks:
+  postgres-net:
+    driver: bridge

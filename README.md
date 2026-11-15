@@ -1,56 +1,147 @@
 # Strava Automation Service
 
-Docker-only Strava + Telegram automation with:
-- FastAPI API (webhook processing in-process)
-- PostgreSQL (external `postgres-net` network)
-- React/TypeScript dashboard
-- MCP server (same backend image)
+Single-user automation that ties Strava activities to Telegram workflows: assign running shoes on new runs, hide gym workouts from your Strava home feed, ingest activities for search and MCP tools, and operate everything from a small React dashboard.
 
-No local dependency installs are required.
+![Home dashboard](docs/images/hero.png)
 
-## Required Values
+## Overview
 
-Copy and fill `.env` from `.env.example`:
+The service listens for Strava and Telegram webhooks, applies your rules in-process on a FastAPI backend, and stores operational history in PostgreSQL. A React frontend proxies `/api` to the backend for same-origin auth cookies. A separate MCP server (same backend image) exposes read-only activity tools to compatible clients.
 
-```sh
-cp .env.example .env
+This application is **single-user**: one connected Strava athlete and one allowed Telegram user. Strava OAuth and Telegram webhooks require a **public HTTPS base URL** that `docker-compose.standalone.yml` does not provide by itself—you must supply `PUBLIC_BASE_URL` (and credentials) when registering webhooks, or leave it unset to skip registration during local runs.
+
+## Features
+
+- **Run shoe picker** — Telegram prompt on every new run so you can change shoes even when a default is set.
+- **Gym hide** — Sets `hide_from_home=true` on weight training and generic workouts.
+- **Activity store** — Local copy of activities, laps, splits, and ingestion jobs for the dashboard and external API.
+- **Backfill** — Queue historical ingestion without blocking webhook handling.
+- **MCP tools** — API-key gated Model Context Protocol server for activity queries.
+- **Dashboard** — Home stats, stored activities, ingestion controls, event log, and settings.
+
+## Screenshots
+
+| Home | Activities | Events |
+|------|------------|--------|
+| ![Home](docs/images/hero.png) | ![Activities](docs/images/feature-01.png) | ![Events](docs/images/feature-02.png) |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph panel["VPS control panel (host)"]
+    NGX[nginx + TLS]
+    PG[(Shared Postgres)]
+    IMG[Docker Hub images]
+  end
+
+  subgraph app["strava-automation-service"]
+    FE[frontend]
+    API[api]
+    MCP[mcp]
+  end
+
+  subgraph standalone["Standalone compose"]
+    PG2[(Postgres 15)]
+    FE2[frontend]
+    API2[api]
+    MCP2[mcp]
+  end
+
+  STRAVA[(Strava API)]
+  TG[(Telegram)]
+
+  IMG --> API
+  IMG --> FE
+  IMG --> MCP
+  API --> PG
+  MCP --> PG
+  FE --> API
+  NGX --> FE
+  STRAVA <-- webhook/OAuth --> API
+  TG <-- webhook --> API
+
+  FE2 --> API2
+  API2 --> PG2
+  MCP2 --> PG2
 ```
 
-Minimum required values:
-- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`
-- `STRAVA_CLIENT_ID`
-- `STRAVA_CLIENT_SECRET`
-- `STRAVA_WEBHOOK_VERIFY_TOKEN`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_WEBHOOK_SECRET`
-- `TELEGRAM_ALLOWED_USER_ID`
-- `PUBLIC_BASE_URL`
-- `APP_SECRET_KEY`
+**Control panel path:** `docker-compose.yml` runs `api`, `frontend`, and `mcp` from prebuilt images on loopback ports, attached to external `postgres-net` (no Postgres service in this file). The panel writes `.env`, pulls tags, runs migrations, and checks `/api/health`.
 
-The Telegram webhook URL is derived from `PUBLIC_BASE_URL`:
-- activity admin bot: `/api/telegram/activityadmin/webhook/{TELEGRAM_WEBHOOK_SECRET}`
+**Standalone path:** `docker-compose.standalone.yml` bundles Postgres 15, builds production images locally, and publishes the frontend on all interfaces; API and MCP stay on loopback.
+
+**Development path:** `docker-compose.dev.yml` bundles Postgres with hot reload on `api` and Vite on `frontend`.
+
+## Technology stack
+
+| Layer | Choice |
+|-------|--------|
+| API | FastAPI, SQLAlchemy, Alembic |
+| Frontend | React, TypeScript, Vite, Tailwind CSS |
+| Database | PostgreSQL 15 |
+| Auth | Strava OAuth + HTTP-only JWT cookie |
+| Integrations | Strava REST + webhooks, Telegram Bot API |
+| MCP | FastMCP (`mcp` service) |
+| Packaging | Docker Compose |
+
+## Getting started
+
+1. `cp .env.example .env` and set database credentials, Strava/Telegram placeholders, and `APP_SECRET_KEY`. For local HTTP, set `COOKIE_SECURE=false`.
+2. Start development Compose:
+
+```sh
+docker compose -f docker-compose.dev.yml up --build
+```
+
+3. Migrate:
+
+```sh
+docker compose -f docker-compose.dev.yml run --rm --no-deps api bash /app/run_migrations.sh
+```
+
+4. Open `http://localhost:${FRONTEND_PORT:-3000}` and connect with Strava.
+
+**Local sign-in:** **Continue with Strava** uses fast login (`POST /api/auth/login`) when a connected user with a refresh token already exists in the database—no live Strava call. A fresh database has no such user until you complete OAuth.
+
+## Configuration
+
+See `.env.example` for all variables. Important groups:
+
+- **Database** — `POSTGRES_*`; use `POSTGRES_HOST=postgres` for dev and standalone Compose.
+- **Strava / Telegram** — OAuth and webhook secrets; `PUBLIC_BASE_URL` for production webhook registration.
+- **Auth** — `APP_SECRET_KEY`, optional `JWT_SECRET_KEY`, `COOKIE_SECURE`.
+- **Compose** — `BACKEND_PORT`, `FRONTEND_PORT`, `MCP_PORT`; image tags are for panel deploys only.
 
 ## Deployment
 
-CI (`.github/workflows/deploy.yml`) builds and pushes `api`, `frontend`, and `mcp` images to Docker Hub on every push to `main`. It does NOT touch the VPS.
+- **Local development** — `docker-compose.dev.yml` (see [Getting started](#getting-started)).
+- **Standalone** — Self-hosted stack with bundled Postgres: `docker-compose.standalone.yml`.
+- **This VPS** — Image-mode deploy via the control panel and root `docker-compose.yml`.
 
-The VPS control panel deploys this repo in `image` mode: it manages `.env` on the VPS, pulls the images by tag, runs migrations via `docker compose run --rm --no-deps api bash /app/run_migrations.sh`, starts `docker compose up -d`, and health-checks `/api/health`. Services: `api`, `frontend`, `mcp` on the external `postgres-net` network, with host ports `BACKEND_PORT`, `FRONTEND_PORT`, `MCP_PORT`.
+Details: [docs/deployment.md](docs/deployment.md).
 
-## Webhook Registration
+## API
 
-The API registers its webhooks automatically at startup. On boot it spawns a background task that idempotently registers the Strava push subscription and the Telegram `setWebhook` (replacing a stale Strava subscription whose callback URL no longer matches `PUBLIC_BASE_URL`), and retries with backoff (30s → 1m → 5m capped) until both succeed — Strava validates the callback URL with a hub.challenge request at creation time, so registration keeps retrying until the public URL is live. Failures never block startup, and registration is skipped when `PUBLIC_BASE_URL` is unset, `APP_ENV=development`, or the relevant credentials are missing.
+- **Health:** `GET /api/health`
+- **Interactive docs:** `GET /docs` on the API port (e.g. `http://127.0.0.1:8000/docs` in standalone).
+- **UI (JWT cookie):** `/api/ui/*` — status, activities, events, ingestion, settings.
+- **Auth:** `/api/auth/strava/*`, `/api/auth/login`, `/api/auth/logout`
+- **Webhooks:** `/api/strava/webhook`, `/api/telegram/activityadmin/webhook/{secret}`
+- **External read API:** `/api/external/*` (API key)
+- **MCP:** separate `mcp` service on `MCP_PORT`
 
-`scripts/register_webhooks.sh` remains as a manual fallback (e.g. after rotating `STRAVA_WEBHOOK_VERIFY_TOKEN`):
+## Development and tests
+
+**Backend (host, with deps installed):**
 
 ```sh
-cd /srv/apps/strava-automation-service
-set -a; . ./.env; set +a
-./scripts/register_webhooks.sh
+cd backend && uv sync --extra dev && uv run pytest
 ```
 
-## Notes
+**Frontend:**
 
-- This is single-user by design.
-- Run flow sends Telegram shoe picker for every run (allows changing gear even when default is pre-assigned).
-- Gym/workout flow updates Strava `hide_from_home=true`.
-- Dashboard polls operational APIs for pending items and recent events.
+```sh
+cd frontend && npm ci && npm test && npm run lint && npm run typecheck
+```
+
+The README images under `docs/images/` are fictional examples. They are not loaded from a script in this repository.

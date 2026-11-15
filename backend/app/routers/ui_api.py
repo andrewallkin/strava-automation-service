@@ -329,7 +329,18 @@ def shoe_vault(
     user: User = Depends(require_jwt_user),
 ) -> list[dict]:
     if not user.access_token:
-        raise HTTPException(status_code=404, detail="No user connected")
+        return [
+            {
+                "strava_gear_id": gear.strava_gear_id,
+                "name": gear.name,
+                "is_default": gear.is_default,
+                "total_distance_m": gear.distance_m or 0,
+                "brand_name": gear.brand_name,
+                "model_name": gear.model_name,
+            }
+            for gear in list_gear(db)
+            if gear.retired is not True
+        ]
     strava = StravaService()
     gears = list_gear(db)
     if not gears:
