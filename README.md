@@ -99,15 +99,9 @@ docker compose -f docker-compose.dev.yml up --build
 docker compose -f docker-compose.dev.yml run --rm --no-deps api bash /app/run_migrations.sh
 ```
 
-4. Optional demo data:
+4. Open `http://localhost:${FRONTEND_PORT:-3000}` and connect with Strava.
 
-```sh
-docker compose -f docker-compose.dev.yml run --rm --no-deps api python /app/scripts/seed_db.py
-```
-
-5. Open `http://localhost:${FRONTEND_PORT:-3000}`.
-
-**Local-only sign-in:** After seeding, click **Continue with Strava** on the login screen. The app uses fast login (`POST /api/auth/login`) when a connected user with a refresh token exists in the database—no live Strava call.
+**Local sign-in:** **Continue with Strava** uses fast login (`POST /api/auth/login`) when a connected user with a refresh token already exists in the database—no live Strava call. A fresh database has no such user until you complete OAuth.
 
 ## Configuration
 
@@ -150,20 +144,4 @@ cd backend && uv sync --extra dev && uv run pytest
 cd frontend && npm ci && npm test && npm run lint && npm run typecheck
 ```
 
-**Screenshots** (standalone stack, after migrate + seed). The seed writes only fictional rows: athlete `9900001`, Telegram user `9100001`, and the name Alex Demo. It does not read `STRAVA_ALLOWED_ATHLETE_ID` or `TELEGRAM_ALLOWED_USER_ID`. For the capture, set those two variables to the fictional ids so a personal allowlist is not applied:
-
-```sh
-export STRAVA_ALLOWED_ATHLETE_ID=9900001 TELEGRAM_ALLOWED_USER_ID=9100001
-```
-
-```sh
-docker compose -f docker-compose.standalone.yml up --build -d
-docker compose -f docker-compose.standalone.yml run --rm --no-deps api bash /app/run_migrations.sh
-docker compose -f docker-compose.standalone.yml run --rm --no-deps api python /app/scripts/seed_db.py
-npm install --prefix scripts
-npx --prefix scripts playwright install chromium
-FRONTEND_URL=http://127.0.0.1:3000 node scripts/capture-screenshots.mjs
-docker compose -f docker-compose.standalone.yml down
-```
-
-Writes `docs/images/hero.png`, `feature-01.png`, and `feature-02.png` at 1440×900. Not run in CI.
+The README images under `docs/images/` are fictional examples. They are not loaded from a script in this repository.

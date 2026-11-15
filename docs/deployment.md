@@ -19,12 +19,6 @@ docker compose -f docker-compose.dev.yml run --rm --no-deps api bash /app/run_mi
 
 4. Open the dashboard at `http://localhost:${FRONTEND_PORT:-3000}` (Vite dev server).
 
-Optional fictional data for UI testing:
-
-```sh
-docker compose -f docker-compose.dev.yml run --rm --no-deps api python /app/scripts/seed_db.py
-```
-
 ## Standalone
 
 Self-contained Postgres and production-style images—no VPS control panel, shared `postgres-net`, or Cloudflare.
@@ -32,7 +26,6 @@ Self-contained Postgres and production-style images—no VPS control panel, shar
 ```sh
 docker compose -f docker-compose.standalone.yml up --build -d
 docker compose -f docker-compose.standalone.yml run --rm --no-deps api bash /app/run_migrations.sh
-docker compose -f docker-compose.standalone.yml run --rm --no-deps api python /app/scripts/seed_db.py
 ```
 
 Open `http://localhost:${FRONTEND_PORT:-3000}`. The API listens on `127.0.0.1:${BACKEND_PORT:-8000}`; interactive docs are at `/docs` on that port.
