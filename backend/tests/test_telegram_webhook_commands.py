@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -6,7 +8,6 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.config import Settings
 from app.db import get_db
 from app.main import app
 from app.models import EventLog, Gear, PendingActivity, StravaActivity, TelegramRenameWait, User
@@ -42,11 +43,9 @@ def api(monkeypatch):
         yield session
 
     app.dependency_overrides[get_db] = override_get_db
-    settings = Settings(
+    settings = SimpleNamespace(
         telegram_webhook_secret="secret",
         telegram_allowed_user_id=5,
-        telegram_bot_token="token",
-        app_secret_key="test-secret-test-secret-test-secret",
     )
     monkeypatch.setattr(telegram_webhook, "get_settings", lambda: settings)
     sent: list[tuple[int, str]] = []
