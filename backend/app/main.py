@@ -2,6 +2,7 @@ import asyncio
 import logging
 import logging.config
 from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,12 +70,28 @@ async def lifespan(_app: FastAPI):
     from app.services.webhook_registration import ensure_webhooks_registered
 
     registration_task = asyncio.create_task(ensure_webhooks_registered(get_settings()))
+    digest_task = asyncio.create_task(_weekly_digest_loop())
     try:
         yield
     finally:
         registration_task.cancel()
+        digest_task.cancel()
         with suppress(asyncio.CancelledError):
             await registration_task
+        with suppress(asyncio.CancelledError):
+            await digest_task
+
+
+async def _weekly_digest_loop() -> None:
+    from app.services.telegram_digest import send_digest_if_due
+
+    log = logging.getLogger("telegram")
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await asyncio.to_thread(send_digest_if_due, datetime.now(timezone.utc))
+        except Exception:
+            log.exception("Weekly digest send failed")
 
 
 app = FastAPI(title="Strava Automation Service", lifespan=lifespan)
