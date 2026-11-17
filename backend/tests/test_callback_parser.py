@@ -12,3 +12,9 @@ def test_parse_callback_data() -> None:
 def test_parse_callback_data_invalid() -> None:
     with pytest.raises(ValueError):
         _parse_callback_data("bad")
+
+
+def test_parse_rename_callback() -> None:
+    from app.routers.telegram_webhook import _parse_rename_callback
+
+    assert _parse_rename_callback("r:99") == 99
