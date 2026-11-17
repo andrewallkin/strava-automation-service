@@ -87,7 +87,7 @@ def process_activity(activity_id: int, owner_id: int | None = None, attempt: int
                     )
                     chat_id = user.telegram_user_id or telegram.settings.telegram_allowed_user_id
                     if chat_id:
-                        telegram.send_message(chat_id, "Gym workout hidden from feed. Strong work.")
+                        telegram.send_activity_receipt(chat_id, activity_id, activity)
                     log.info('Gym workout hidden: "%s" | activity=%s', activity.get("name", ""), activity_id)
                     log_event(
                         db,
@@ -98,12 +98,15 @@ def process_activity(activity_id: int, owner_id: int | None = None, attempt: int
                     )
                     return
 
-                log.info("Activity ignored | type=%s activity=%s", activity_type, activity_id)
+                chat_id = user.telegram_user_id or telegram.settings.telegram_allowed_user_id
+                if chat_id:
+                    telegram.send_activity_receipt(chat_id, activity_id, activity)
+                log.info("Activity receipt sent | type=%s activity=%s", activity_type, activity_id)
                 log_event(
                     db,
-                    event_type="activity_ignored",
+                    event_type="activity_receipt",
                     status="ok",
-                    message=f"Ignored activity type: {activity_type}",
+                    message=f"Sent Telegram receipt for {activity_type}",
                     payload={"activity_id": activity_id, "type": activity_type},
                 )
                 return
