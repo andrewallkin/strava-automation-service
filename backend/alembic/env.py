@@ -9,6 +9,8 @@ from app.models import (  # noqa: F401
     EventLog,
     Gear,
     PendingActivity,
+    TelegramRenameWait,
+    WeeklyDigestSend,
     StravaActivity,
     StravaActivityBestEffort,
     StravaActivityLap,

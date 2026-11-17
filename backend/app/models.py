@@ -73,6 +73,23 @@ class Gear(Base):
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class TelegramRenameWait(Base):
+    __tablename__ = "telegram_rename_waits"
+    __table_args__ = (UniqueConstraint("chat_id", name="uq_telegram_rename_wait_chat"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    activity_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WeeklyDigestSend(Base):
+    __tablename__ = "weekly_digest_sends"
+
+    week_start: Mapped[date] = mapped_column(Date, primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class PendingActivity(Base):
     __tablename__ = "pending_activities"
     __table_args__ = (UniqueConstraint("activity_id", name="uq_pending_activity_id"),)
