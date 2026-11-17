@@ -16,3 +16,10 @@ def format_moving_time_s(seconds: int | float) -> str:
     if not parts:
         parts.append("0s")
     return " ".join(parts)
+
+
+def format_clock_duration(seconds: int | float) -> str:
+    total = max(0, int(seconds))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours}h {minutes}m {secs}s"
