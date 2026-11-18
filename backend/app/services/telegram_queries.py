@@ -6,6 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Gear, StravaActivity, User
+from app.services.activity_service import include_gear_in_shoe_vault
 from app.services.telegram_messages import (
     RUN_TYPES,
     WeekActivity,
@@ -66,7 +67,7 @@ def recent_text(db: Session, user: User) -> str:
     chosen = rows[:5]
     if not chosen:
         return "No activities stored."
-    return "\n".join(
+    return "\n\n".join(
         format_recent_line(
             row.sport_type or row.activity_type or "Activity",
             row.name or "Activity",
@@ -94,17 +95,31 @@ def streak_text(db: Session, user: User, today: date) -> str:
     return format_streak(days)
 
 
+def _is_active_shoe(gear: Gear) -> bool:
+    if gear.retired is True:
+        return False
+    raw = gear.raw_data if isinstance(gear.raw_data, dict) else {}
+    if raw:
+        return include_gear_in_shoe_vault({**raw, "retired": gear.retired})
+    return not (gear.strava_gear_id or "").startswith("b")
+
+
 def shoes_text(db: Session) -> str:
-    shoes = list(
-        db.scalars(select(Gear).where(or_(Gear.retired.is_(False), Gear.retired.is_(None))).order_by(Gear.name.asc())).all()
-    )
+    shoes = [
+        gear
+        for gear in db.scalars(
+            select(Gear).where(or_(Gear.retired.is_(False), Gear.retired.is_(None))).order_by(Gear.name.asc())
+        ).all()
+        if _is_active_shoe(gear)
+    ]
     if not shoes:
         return "No shoes stored."
-    return "\n".join(
+    blocks = [
         format_shoe_line(
             shoe.nickname or shoe.name,
             shoe.distance_m or 0,
             shoe.notification_distance_m,
         )
         for shoe in shoes
-    )
+    ]
+    return "👟 Shoes\n\n" + "\n\n".join(blocks)

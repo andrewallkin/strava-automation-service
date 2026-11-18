@@ -7,6 +7,23 @@ from app.time_formatting import format_clock_duration
 
 RUN_TYPES = {"Run", "VirtualRun", "TrailRun", "TreadmillRun", "TrackRun"}
 DAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+SPORT_EMOJI = {
+    "Run": "🏃",
+    "VirtualRun": "🏃",
+    "TrailRun": "🏃",
+    "TreadmillRun": "🏃",
+    "TrackRun": "🏃",
+    "WeightTraining": "🏋️",
+    "Ride": "🚴",
+    "VirtualRide": "🚴",
+    "EBikeRide": "🚴",
+    "MountainBikeRide": "🚴",
+    "GravelRide": "🚴",
+    "Swim": "🏊",
+    "Walk": "🚶",
+    "Hike": "🥾",
+    "Yoga": "🧘",
+}
 
 
 @dataclass(frozen=True)
@@ -69,11 +86,27 @@ def _week_header(start: date, end: date) -> str:
     return f"📅 {start.day}–{end.day} {end.strftime('%b')}"
 
 
-def _week_activity_line(activity: WeekActivity) -> str:
-    if activity.sport_type in RUN_TYPES and activity.distance_m > 0:
-        km = activity.distance_m / 1000
-        return f"{activity.name} · {km:.1f} km · {format_pace(activity.distance_m, activity.moving_s)}"
-    return f"{activity.name} · {format_clock_duration(activity.moving_s)}"
+def _sport_emoji(sport_type: str) -> str:
+    return SPORT_EMOJI.get(sport_type, "•")
+
+
+def _activity_stats(sport_type: str, distance_m: float, moving_s: float) -> str:
+    if sport_type in RUN_TYPES and distance_m > 0:
+        km = distance_m / 1000
+        return f"{km:.1f} km · {format_pace(distance_m, moving_s)}"
+    if distance_m > 0:
+        return f"{distance_m / 1000:.1f} km · {format_clock_duration(moving_s)}"
+    return format_clock_duration(moving_s)
+
+
+def _activity_block(sport_type: str, name: str, distance_m: float, moving_s: float) -> str:
+    return f"{_sport_emoji(sport_type)} {name}\n{_activity_stats(sport_type, distance_m, moving_s)}"
+
+
+def _empty_day_span(start_index: int, end_index: int) -> str:
+    if start_index == end_index:
+        return f"{DAY_LABELS[start_index]} —"
+    return f"{DAY_LABELS[start_index]}–{DAY_LABELS[end_index]} —"
 
 
 def format_week(start: date, activities: list[WeekActivity], previous_km: float) -> str:
@@ -86,58 +119,57 @@ def format_week(start: date, activities: list[WeekActivity], previous_km: float)
     lines = [_week_header(start, start + timedelta(days=6)), ""]
     total_distance_m = 0.0
     total_moving_s = 0
-    for index, label in enumerate(DAY_LABELS):
-        runs = sorted(
-            (item for item in grouped[index] if item.sport_type in RUN_TYPES),
-            key=lambda item: item.start,
-        )
-        others = sorted(
-            (item for item in grouped[index] if item.sport_type not in RUN_TYPES),
-            key=lambda item: item.start,
-        )
-        ordered = runs + others
+    empty_start: int | None = None
+    for index in range(7):
+        ordered = sorted(grouped[index], key=lambda item: item.start)
         if not ordered:
-            lines.append(f"{label}  —")
+            if empty_start is None:
+                empty_start = index
             continue
-        for position, activity in enumerate(ordered):
-            body = _week_activity_line(activity)
-            lines.append(f"{label}  {body}" if position == 0 else f"     {body}")
+        if empty_start is not None:
+            lines.append(_empty_day_span(empty_start, index - 1))
+            lines.append("")
+            empty_start = None
+        lines.append(DAY_LABELS[index])
+        for activity in ordered:
+            lines.append(_activity_block(activity.sport_type, activity.name, activity.distance_m, activity.moving_s))
             total_distance_m += activity.distance_m
             total_moving_s += activity.moving_s
+        lines.append("")
+    if empty_start is not None:
+        lines.append(_empty_day_span(empty_start, 6))
+        lines.append("")
 
     this_km = total_distance_m / 1000
     delta = this_km - previous_km
-    lines.extend(["", f"{this_km:.1f} km · {format_clock_duration(total_moving_s)}"])
+    lines.append("This week")
+    lines.append(f"{this_km:.1f} km · {format_clock_duration(total_moving_s)}")
     if abs(delta) < 0.05:
         lines.append("Same distance as last week")
     elif delta > 0:
         lines.append(f"📈 {delta:.1f} km more than last week")
     else:
         lines.append(f"📉 {abs(delta):.1f} km less than last week")
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()
 
 
 def format_shoe_line(name: str, distance_m: float, notification_distance_m: float | None) -> str:
     km = distance_m / 1000
-    flag = ""
-    if notification_distance_m is not None and distance_m >= notification_distance_m:
-        flag = "replace"
+    note = ""
+    # Strava stores 0 when the athlete has not set a replacement distance.
+    if notification_distance_m and distance_m >= notification_distance_m:
+        note = "time to replace"
     elif km >= 800:
-        flag = "replace"
+        note = "time to replace"
     elif km >= 600:
-        flag = "consider replacement"
-    line = f"{name} · {km:.1f} km"
-    if flag:
-        line = f"{line} · {flag}"
-    return line
+        note = "consider replacing"
+    title = f"⚠️ {name}" if note else name
+    stats = f"{km:.1f} km · {note}" if note else f"{km:.1f} km"
+    return f"{title}\n{stats}"
 
 
 def format_recent_line(sport_type: str, name: str, distance_m: float, moving_s: int) -> str:
-    if sport_type in RUN_TYPES and distance_m > 0:
-        return f"{sport_type} · {name} · {distance_m / 1000:.1f} km · {format_pace(distance_m, moving_s)}"
-    if distance_m > 0:
-        return f"{sport_type} · {name} · {distance_m / 1000:.1f} km · {format_clock_duration(moving_s)}"
-    return f"{sport_type} · {name} · {format_clock_duration(moving_s)}"
+    return _activity_block(sport_type, name, distance_m, moving_s)
 
 
 def format_streak(days: int) -> str:
