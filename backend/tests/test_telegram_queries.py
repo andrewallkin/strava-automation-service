@@ -67,8 +67,8 @@ def test_week_text_lists_run_and_gym_on_monday(db) -> None:
         moving_time_seconds=2880,
     )
     text = week_text(db, _user(db), date(2026, 11, 11))
-    assert "Mon  Morning Run · 8.2 km · 5:08/km" in text
-    assert "     Gym · 0h 48m 0s" in text
+    assert "Mon\n🏃 Morning Run\n8.2 km · 5:08/km" in text
+    assert "🏋️ Gym\n0h 48m 0s" in text
 
 
 def test_recent_text_returns_five_newest(db) -> None:
@@ -81,9 +81,8 @@ def test_recent_text_returns_five_newest(db) -> None:
             local_date=date(2026, 11, 1),
         )
     text = recent_text(db, _user(db))
-    lines = text.splitlines()
-    assert len(lines) == 5
-    assert lines[0].startswith("Run · Activity 5")
+    assert text.startswith("🏃 Activity 5\n")
+    assert text.count("🏃 Activity") == 5
     assert "Activity 0" not in text
 
 
@@ -99,10 +98,22 @@ def test_streak_counts_yesterday_when_today_is_empty(db) -> None:
     assert streak_text(db, _user(db), date(2026, 11, 17)) == "1-day run streak"
 
 
-def test_shoes_text_skips_retired_and_flags_mileage(db) -> None:
+def test_shoes_text_skips_retired_bikes_and_flags_mileage(db) -> None:
     db.add(Gear(strava_gear_id="old", name="Retired", retired=True, distance_m=900_000))
-    db.add(Gear(strava_gear_id="peg", name="Pegasus", nickname="Daily", retired=False, distance_m=612_400))
+    db.add(Gear(strava_gear_id="g1", name="Pegasus", nickname="Daily", retired=False, distance_m=612_400))
+    db.add(
+        Gear(
+            strava_gear_id="b1",
+            name="Scott Addict RC15",
+            retired=False,
+            distance_m=9_043_200,
+            raw_data={"frame_type": 3},
+        )
+    )
+    db.add(Gear(strava_gear_id="b2", name="Kickr", retired=False, distance_m=15_197_500))
     db.commit()
     text = shoes_text(db)
     assert "Retired" not in text
-    assert "Daily · 612.4 km · consider replacement" in text
+    assert "Scott" not in text
+    assert "Kickr" not in text
+    assert "👟 Shoes\n\n⚠️ Daily\n612.4 km · consider replacing" in text
