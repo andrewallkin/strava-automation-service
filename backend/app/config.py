@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     public_base_url: str = ""
     frontend_base_url: str = ""
     ui_api_base_url: str = "/api"
+    mcp_public_base_url: str = ""
 
     @property
     def database_url(self) -> str:
@@ -83,6 +84,20 @@ class Settings(BaseSettings):
         if not self.public_base_url:
             return ""
         return f"{self._normalized_public_base_url}/api/strava/webhook"
+
+    @property
+    def mcp_oauth_base_url(self) -> str:
+        """Public origin of the MCP process, with no trailing slash.
+
+        ChatGPT's OAuth metadata, authorize, and token URLs are rooted here.
+        When the MCP service is published under a path prefix, set
+        MCP_PUBLIC_BASE_URL to that prefix (for example https://host/mcp).
+        """
+        if self.mcp_public_base_url.strip():
+            return self.mcp_public_base_url.strip().rstrip("/")
+        if self.public_base_url.strip():
+            return f"{self._normalized_public_base_url}/mcp"
+        return "http://127.0.0.1:8000"
 
 
 @lru_cache

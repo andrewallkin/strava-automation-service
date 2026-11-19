@@ -55,6 +55,27 @@ class McpApiKey(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class McpOAuthClient(Base):
+    __tablename__ = "mcp_oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+
+
+class McpOAuthGrant(Base):
+    __tablename__ = "mcp_oauth_grants"
+    __table_args__ = (Index("idx_mcp_oauth_grants_user", "user_id", "kind"),)
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    client_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    partner_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Gear(Base):
     __tablename__ = "gear"
 

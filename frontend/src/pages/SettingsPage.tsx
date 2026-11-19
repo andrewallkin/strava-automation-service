@@ -325,9 +325,14 @@ export function SettingsPage({ status, onStatusChange }: SettingsPageProps) {
         <div className="px-5 py-4">
           <h2 className="text-sm font-semibold text-gray-900">MCP access</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Generate an API key for Claude Desktop (or any MCP client that uses the same JSON shape) with{" "}
-            <code className="text-gray-700">mcp-remote</code>. Keys can only read activities for your connected
-            Strava athlete (same tools as the hosted MCP server).
+            Tools return the same JSON as the external API. Claude Desktop still uses an API key with{" "}
+            <code className="text-gray-700">mcp-remote</code>. ChatGPT uses OAuth instead: in ChatGPT Plugins,
+            add the custom MCP server below, choose OAuth, then sign in to this dashboard and choose Allow.
+            Only the signed-in owner can approve that connection.
+          </p>
+          <p className="text-xs text-gray-600 mt-2">
+            ChatGPT server URL:{" "}
+            <code className="text-gray-800">https://strava.andrewallkin.cloud/mcp/mcp</code>
           </p>
         </div>
 

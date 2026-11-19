@@ -54,3 +54,14 @@ The VPS control panel deploys this repository in **image mode**:
 - Health-checks `GET /api/health`.
 
 The panel supplies production `POSTGRES_*` values and image tags; TLS and public URLs are configured on the host, not in this repository.
+
+ChatGPT connects to `${MCP_PUBLIC_BASE_URL}/mcp` (default `${PUBLIC_BASE_URL}/mcp/mcp`) and discovers OAuth at `${MCP_PUBLIC_BASE_URL}/.well-known/`. When the public MCP prefix is stripped by the reverse proxy, also forward the host-root discovery paths to the MCP port so RFC 8414 clients can read them:
+
+```nginx
+location ^~ /.well-known/oauth-authorization-server {
+    proxy_pass http://127.0.0.1:${MCP_PORT};
+}
+location ^~ /.well-known/oauth-protected-resource {
+    proxy_pass http://127.0.0.1:${MCP_PORT};
+}
+```
