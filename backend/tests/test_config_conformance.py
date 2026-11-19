@@ -1,8 +1,6 @@
 """Config-contract and per-container smoke tests (api, frontend, mcp)."""
 
-from datetime import timezone
 from unittest.mock import MagicMock, patch
-from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import FastAPI
@@ -160,54 +158,36 @@ def test_cors_middleware_mounted_with_configured_origins(
 
 
 def test_mcp_server_exposes_fastmcp_instance_with_auth() -> None:
-    from fastmcp.server.auth.providers.debug import DebugTokenVerifier
+    from fastmcp.server.auth import MultiAuth
 
     from app.mcp import server
+    from app.mcp.oauth_provider import OwnerOAuthProvider
 
     assert server.mcp is not None
     assert server.mcp.name == "strava-automation-service"
-    assert isinstance(server.mcp.auth, DebugTokenVerifier)
+    assert isinstance(server.mcp.auth, MultiAuth)
+    assert isinstance(server.mcp.auth.server, OwnerOAuthProvider)
 
 
-def test_mcp_configured_timezone_falls_back_to_utc(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.mcp import server
-
-    monkeypatch.setenv("TIMEZONE", "Not/ARealZone")
-    get_settings.cache_clear()
-    try:
-        assert server._configured_timezone() == timezone.utc
-    finally:
-        get_settings.cache_clear()
-
-
-def test_mcp_configured_timezone_uses_settings() -> None:
-    from app.mcp import server
-
-    get_settings.cache_clear()
-    try:
-        assert server._configured_timezone() == ZoneInfo("UTC")
-    finally:
-        get_settings.cache_clear()
-
-
-def test_mcp_run_tool_reports_auth_failure() -> None:
-    from app.mcp import server
+def test_invoke_external_reports_auth_failure() -> None:
     from app.mcp.auth import McpAuthError
+    from app.mcp.external_tools import invoke_external
 
-    with patch.object(server, "require_mcp_user", side_effect=McpAuthError("no key")):
-        result = server._run_tool(lambda db, user: "never")
-    assert result == "Authentication failed: no key"
+    with patch("app.mcp.external_tools.require_mcp_user", side_effect=McpAuthError("no key")):
+        result = invoke_external(lambda **kwargs: {"ok": True})
+    assert result == {"error": {"code": "unauthorized", "message": "no key"}}
 
 
-def test_mcp_run_tool_reports_invalid_request() -> None:
-    from app.mcp import server
+def test_invoke_external_reports_invalid_query() -> None:
+    from app.external_errors import ExternalAPIError
+    from app.mcp.external_tools import invoke_external
 
-    def bad_operation(db, user) -> str:
-        raise ValueError("bad date")
+    def bad_operation(**kwargs):
+        raise ExternalAPIError(422, "invalid_query", "weeks must be between 1 and 26")
 
-    with patch.object(server, "require_mcp_user", return_value=MagicMock()):
-        result = server._run_tool(bad_operation)
-    assert result == "Invalid request: bad date"
+    with patch("app.mcp.external_tools.require_mcp_user", return_value=MagicMock()):
+        result = invoke_external(bad_operation)
+    assert result == {"error": {"code": "invalid_query", "message": "weeks must be between 1 and 26"}}
 
 
 def test_mcp_api_key_hash_uses_jwt_secret_key(monkeypatch: pytest.MonkeyPatch) -> None:
